@@ -3,4 +3,4 @@
 	url = git://xreal.git.sourceforge.net/gitroot/xreal/ET-XreaL_etxradiant
 [submodule "etmain"]
 	path = etmain
-	url = ssh://tcmreastwood@git.code.sf.net/p/openterritory/etmain.git
+	url = git://git.code.sf.net/p/openterritory/etmain.git
