@@ -2,6 +2,7 @@
 #include "PropertyEditorFactory.h"
 #include "ui/common/SoundChooser.h"
 
+#include "i18n.h"
 #include "ientity.h"
 
 #include <gtk/gtk.h>
@@ -23,7 +24,7 @@ SoundPropertyEditor::SoundPropertyEditor(Entity* entity,
 	gtk_container_set_border_width(GTK_CONTAINER(hbx), 3);
 	
 	// Browse button
-	GtkWidget* browseButton = gtk_button_new_with_label("Choose sound...");
+	GtkWidget* browseButton = gtk_button_new_with_label(_("Choose sound..."));
 	gtk_button_set_image(
 		GTK_BUTTON(browseButton),
 		gtk_image_new_from_pixbuf(
@@ -50,8 +51,11 @@ void SoundPropertyEditor::_onBrowseButton(GtkWidget* w,
 {
 	// Use a SoundChooser dialog to get a selection from the user
 	SoundChooser chooser;
-	std::string selection = chooser.chooseSound(); 
-	if (!selection.empty()) {
+	const std::string& selection = chooser.chooseSound();
+
+	// Selection will be empy if user clicked cancel or X
+	if (!selection.empty())
+	{
 		// Apply the change to the entity
 		self->setKeyValue(self->_key, selection);
 	}
