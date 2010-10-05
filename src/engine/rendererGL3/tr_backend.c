@@ -933,7 +933,7 @@ void GL_VertexAttribPointers(uint32_t attribBits)
 			GLimp_LogComment("glVertexAttribPointerARB( ATTR_INDEX_POSITION )\n");
 		}
 
-		glVertexAttribPointerARB(ATTR_INDEX_POSITION, 4, GL_FLOAT, 0, 0, BUFFER_OFFSET(glState.currentVBO->ofsXYZ));
+		glVertexAttribPointerARB(ATTR_INDEX_POSITION, 4, GL_FLOAT, 0, 0, BUFFER_OFFSET(glState.currentVBO->ofsXYZ + (glState.vertexAttribsFrame * glState.currentVBO->sizeXYZ)));
 		glState.vertexAttribPointersSet |= ATTR_POSITION;
 	}
 
@@ -966,7 +966,7 @@ void GL_VertexAttribPointers(uint32_t attribBits)
 			GLimp_LogComment("glVertexAttribPointerARB( ATTR_INDEX_TANGENT )\n");
 		}
 
-		glVertexAttribPointerARB(ATTR_INDEX_TANGENT, 3, GL_FLOAT, 0, 16, BUFFER_OFFSET(glState.currentVBO->ofsTangents));
+		glVertexAttribPointerARB(ATTR_INDEX_TANGENT, 3, GL_FLOAT, 0, 16, BUFFER_OFFSET(glState.currentVBO->ofsTangents + (glState.vertexAttribsFrame * glState.currentVBO->sizeTangents)));
 		glState.vertexAttribPointersSet |= ATTR_TANGENT;
 	}
 
@@ -977,7 +977,7 @@ void GL_VertexAttribPointers(uint32_t attribBits)
 			GLimp_LogComment("glVertexAttribPointerARB( ATTR_INDEX_BINORMAL )\n");
 		}
 
-		glVertexAttribPointerARB(ATTR_INDEX_BINORMAL, 3, GL_FLOAT, 0, 16, BUFFER_OFFSET(glState.currentVBO->ofsBinormals));
+		glVertexAttribPointerARB(ATTR_INDEX_BINORMAL, 3, GL_FLOAT, 0, 16, BUFFER_OFFSET(glState.currentVBO->ofsBinormals + (glState.vertexAttribsFrame * glState.currentVBO->sizeBinormals)));
 		glState.vertexAttribPointersSet |= ATTR_BINORMAL;
 	}
 
@@ -988,7 +988,7 @@ void GL_VertexAttribPointers(uint32_t attribBits)
 			GLimp_LogComment("glVertexAttribPointerARB( ATTR_INDEX_NORMAL )\n");
 		}
 
-		glVertexAttribPointerARB(ATTR_INDEX_NORMAL, 3, GL_FLOAT, 0, 16, BUFFER_OFFSET(glState.currentVBO->ofsNormals));
+		glVertexAttribPointerARB(ATTR_INDEX_NORMAL, 3, GL_FLOAT, 0, 16, BUFFER_OFFSET(glState.currentVBO->ofsNormals + (glState.vertexAttribsFrame * glState.currentVBO->sizeNormals)));
 		glState.vertexAttribPointersSet |= ATTR_NORMAL;
 	}
 
@@ -1359,7 +1359,7 @@ static void Render_lightVolume(interaction_t * ia)
 			VectorCopy(light->origin, lightOrigin);
 			VectorCopy(tess.svars.color, lightColor);
 
-			shadowCompare = r_shadows->integer >= 4 && !light->l.noShadows && light->shadowLOD >= 0;
+			shadowCompare = r_shadows->integer >= SHADOWING_VSM16 && !light->l.noShadows && light->shadowLOD >= 0;
 
 			GLSL_SetUniform_ViewOrigin(&tr.lightVolumeShader_omni, viewOrigin);
 			GLSL_SetUniform_LightOrigin(&tr.lightVolumeShader_omni, lightOrigin);
@@ -3007,6 +3007,7 @@ static void RB_RenderInteractionsShadowMapped()
 
 									GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, light->shadowMatrices[frustumIndex]);
 
+									tess.multiDrawPrimitives = 0;
 									tess.numIndexes = 0;
 									tess.numVertexes = 0;
 
@@ -3790,6 +3791,7 @@ void RB_RenderInteractionsDeferred()
 					GL_LoadModelViewMatrix(backEnd.orientation.modelViewMatrix);
 					GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, glState.modelViewProjectionMatrix[glState.stackIndex]);
 
+					tess.multiDrawPrimitives = 0;
 					tess.numIndexes = 0;
 					tess.numVertexes = 0;
 
@@ -5440,6 +5442,7 @@ static void RB_RenderInteractionsDeferredShadowMapped()
 					GL_LoadModelViewMatrix(backEnd.orientation.modelViewMatrix);
 					GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, glState.modelViewProjectionMatrix[glState.stackIndex]);
 
+					tess.multiDrawPrimitives = 0;
 					tess.numIndexes = 0;
 					tess.numVertexes = 0;
 
@@ -6174,6 +6177,7 @@ static void RB_RenderInteractionsDeferredShadowMapped()
 
 							GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, light->shadowMatrices[frustumIndex]);
 
+							tess.multiDrawPrimitives = 0;
 							tess.numIndexes = 0;
 							tess.numVertexes = 0;
 
@@ -6275,6 +6279,7 @@ static void RB_RenderInteractionsDeferredShadowMapped()
 								Tess_DrawElements();
 							}
 
+							tess.multiDrawPrimitives = 0;
 							tess.numIndexes = 0;
 							tess.numVertexes = 0;
 
@@ -7962,7 +7967,8 @@ void RB_CameraPostFX(void)
 
 	GLimp_LogComment("--- RB_CameraPostFX ---\n");
 
-	if((backEnd.refdef.rdflags & RDF_NOWORLDMODEL) || !r_cameraPostFX->integer || backEnd.viewParms.isPortal)
+	if((backEnd.refdef.rdflags & RDF_NOWORLDMODEL) || !r_cameraPostFX->integer || backEnd.viewParms.isPortal ||
+		!tr.grainImage || !tr.vignetteImage)
 		return;
 
 	// set 2D virtual screen size
@@ -8333,6 +8339,7 @@ static void RenderLightOcclusionVolume( trRefLight_t * light)
 		GL_LoadModelViewMatrix(backEnd.orientation.modelViewMatrix);
 		GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, glState.modelViewProjectionMatrix[glState.stackIndex]);
 
+		tess.multiDrawPrimitives = 0;
 		tess.numIndexes = 0;
 		tess.numVertexes = 0;
 
@@ -8357,6 +8364,7 @@ static void RenderLightOcclusionVolume( trRefLight_t * light)
 				PlanesGetIntersectionPoint(frustum[FRUSTUM_RIGHT], frustum[FRUSTUM_BOTTOM], frustum[FRUSTUM_FAR], farCorners[2]);
 				PlanesGetIntersectionPoint(frustum[FRUSTUM_LEFT], frustum[FRUSTUM_BOTTOM], frustum[FRUSTUM_FAR], farCorners[3]);
 
+				tess.multiDrawPrimitives = 0;
 				tess.numVertexes = 0;
 				tess.numIndexes = 0;
 
@@ -8438,6 +8446,7 @@ static void RenderLightOcclusionVolume( trRefLight_t * light)
 		}
 	}
 
+	tess.multiDrawPrimitives = 0;
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 
@@ -9023,6 +9032,7 @@ void RB_RenderBspOcclusionQueries()
 
 			backEnd.pc.c_occlusionQueries++;
 
+			tess.multiDrawPrimitives = 0;
 			tess.numIndexes = 0;
 			tess.numVertexes = 0;
 		}
@@ -9273,6 +9283,7 @@ static void RB_RenderDebugUtils()
 
 					Tess_DrawElements();
 
+					tess.multiDrawPrimitives = 0;
 					tess.numIndexes = 0;
 					tess.numVertexes = 0;
 				}
@@ -9284,6 +9295,7 @@ static void RB_RenderDebugUtils()
 					GL_LoadModelViewMatrix(backEnd.orientation.modelViewMatrix);
 					GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, glState.modelViewProjectionMatrix[glState.stackIndex]);
 
+					tess.multiDrawPrimitives = 0;
 					tess.numIndexes = 0;
 					tess.numVertexes = 0;
 
@@ -9339,7 +9351,7 @@ static void RB_RenderDebugUtils()
 
 							tess.numVertexes = 0;
 							tess.numIndexes = 0;
-
+							tess.multiDrawPrimitives = 0;
 
 							if(!VectorCompare(light->l.projStart, vec3_origin))
 							{
@@ -9438,6 +9450,7 @@ static void RB_RenderDebugUtils()
 							break;
 					}
 
+					tess.multiDrawPrimitives = 0;
 					tess.numIndexes = 0;
 					tess.numVertexes = 0;
 				}
@@ -9519,7 +9532,7 @@ static void RB_RenderDebugUtils()
 			GL_LoadModelViewMatrix(backEnd.orientation.modelViewMatrix);
 			GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, glState.modelViewProjectionMatrix[glState.stackIndex]);
 
-			if(r_shadows->integer >= 4 && light->l.rlType == RL_OMNI)
+			if(r_shadows->integer >= SHADOWING_VSM16 && light->l.rlType == RL_OMNI)
 			{
 #if 0
 				Vector4Copy(colorMdGrey, lightColor);
@@ -9580,6 +9593,7 @@ static void RB_RenderDebugUtils()
 
 			tess.numVertexes = 0;
 			tess.numIndexes = 0;
+			tess.multiDrawPrimitives = 0;
 
 			if(*surface == SF_FACE || *surface == SF_GRID || *surface == SF_TRIANGLES)
 			{
@@ -9621,6 +9635,7 @@ static void RB_RenderDebugUtils()
 			Tess_UpdateVBOs(ATTR_POSITION | ATTR_COLOR);
 			Tess_DrawElements();
 
+			tess.multiDrawPrimitives = 0;
 			tess.numIndexes = 0;
 			tess.numVertexes = 0;
 
@@ -9656,6 +9671,8 @@ static void RB_RenderDebugUtils()
 		trRefEntity_t  *ent;
 		int             i;
 		vec4_t          quadVerts[4];
+		vec3_t			mins = {-1,-1,-1};
+		vec3_t			maxs = { 1, 1, 1};
 
 		GL_BindProgram(&tr.genericSingleShader);
 		GL_State(GLS_POLYMODE_LINE | GLS_DEPTHTEST_DISABLE);
@@ -9683,55 +9700,28 @@ static void RB_RenderDebugUtils()
 			if((ent->e.renderfx & RF_THIRD_PERSON) && !backEnd.viewParms.isPortal)
 				continue;
 
+			if(ent->cull == CULL_OUT)
+				continue;
+
 			// set up the transformation matrix
 			R_RotateEntityForViewParms(ent, &backEnd.viewParms, &backEnd.orientation);
 			GL_LoadModelViewMatrix(backEnd.orientation.modelViewMatrix);
 			GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, glState.modelViewProjectionMatrix[glState.stackIndex]);
 
-			R_DebugAxis(vec3_origin, matrixIdentity);
+			//R_DebugAxis(vec3_origin, matrixIdentity);
 			//R_DebugBoundingBox(vec3_origin, ent->localBounds[0], ent->localBounds[1], colorMagenta);
+			
+			tess.multiDrawPrimitives = 0;
 			tess.numIndexes = 0;
 			tess.numVertexes = 0;
 
-			Vector4Set(quadVerts[0], ent->localBounds[0][0], ent->localBounds[0][1], ent->localBounds[0][2], 1);
-			Vector4Set(quadVerts[1], ent->localBounds[0][0], ent->localBounds[1][1], ent->localBounds[0][2], 1);
-			Vector4Set(quadVerts[2], ent->localBounds[0][0], ent->localBounds[1][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[3], ent->localBounds[0][0], ent->localBounds[0][1], ent->localBounds[1][2], 1);
-			Tess_AddQuadStamp2(quadVerts, colorRed);
-
-			Vector4Set(quadVerts[0], ent->localBounds[1][0], ent->localBounds[0][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[1], ent->localBounds[1][0], ent->localBounds[1][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[2], ent->localBounds[1][0], ent->localBounds[1][1], ent->localBounds[0][2], 1);
-			Vector4Set(quadVerts[3], ent->localBounds[1][0], ent->localBounds[0][1], ent->localBounds[0][2], 1);
-			Tess_AddQuadStamp2(quadVerts, colorGreen);
-
-			Vector4Set(quadVerts[0], ent->localBounds[0][0], ent->localBounds[0][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[1], ent->localBounds[0][0], ent->localBounds[1][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[2], ent->localBounds[1][0], ent->localBounds[1][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[3], ent->localBounds[1][0], ent->localBounds[0][1], ent->localBounds[1][2], 1);
-			Tess_AddQuadStamp2(quadVerts, colorBlue);
-
-			Vector4Set(quadVerts[0], ent->localBounds[1][0], ent->localBounds[0][1], ent->localBounds[0][2], 1);
-			Vector4Set(quadVerts[1], ent->localBounds[1][0], ent->localBounds[1][1], ent->localBounds[0][2], 1);
-			Vector4Set(quadVerts[2], ent->localBounds[0][0], ent->localBounds[1][1], ent->localBounds[0][2], 1);
-			Vector4Set(quadVerts[3], ent->localBounds[0][0], ent->localBounds[0][1], ent->localBounds[0][2], 1);
-			Tess_AddQuadStamp2(quadVerts, colorYellow);
-
-			Vector4Set(quadVerts[0], ent->localBounds[0][0], ent->localBounds[0][1], ent->localBounds[0][2], 1);
-			Vector4Set(quadVerts[1], ent->localBounds[0][0], ent->localBounds[0][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[2], ent->localBounds[1][0], ent->localBounds[0][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[3], ent->localBounds[1][0], ent->localBounds[0][1], ent->localBounds[0][2], 1);
-			Tess_AddQuadStamp2(quadVerts, colorMagenta);
-
-			Vector4Set(quadVerts[0], ent->localBounds[1][0], ent->localBounds[1][1], ent->localBounds[0][2], 1);
-			Vector4Set(quadVerts[1], ent->localBounds[1][0], ent->localBounds[1][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[2], ent->localBounds[0][0], ent->localBounds[1][1], ent->localBounds[1][2], 1);
-			Vector4Set(quadVerts[3], ent->localBounds[0][0], ent->localBounds[1][1], ent->localBounds[0][2], 1);
-			Tess_AddQuadStamp2(quadVerts, colorCyan);
+			Tess_AddCube(vec3_origin, ent->localBounds[0], ent->localBounds[1], colorBlue);
+			Tess_AddCube(vec3_origin, mins, maxs, colorWhite);
 
 			Tess_UpdateVBOs(ATTR_POSITION | ATTR_COLOR);
 			Tess_DrawElements();
 
+			tess.multiDrawPrimitives = 0;
 			tess.numIndexes = 0;
 			tess.numVertexes = 0;
 
@@ -9792,6 +9782,7 @@ static void RB_RenderDebugUtils()
 			GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, glState.modelViewProjectionMatrix[glState.stackIndex]);
 
 
+			tess.multiDrawPrimitives = 0;
 			tess.numVertexes = 0;
 			tess.numIndexes = 0;
 
@@ -9890,6 +9881,7 @@ static void RB_RenderDebugUtils()
 
 				Tess_DrawElements();
 
+				tess.multiDrawPrimitives = 0;
 				tess.numVertexes = 0;
 				tess.numIndexes = 0;
 
@@ -9949,6 +9941,7 @@ static void RB_RenderDebugUtils()
 
 						Tess_DrawElements();
 
+						tess.multiDrawPrimitives = 0;
 						tess.numVertexes = 0;
 						tess.numIndexes = 0;
 					}
@@ -9956,6 +9949,7 @@ static void RB_RenderDebugUtils()
 #endif // REFBONE_NAMES
 			}
 
+			tess.multiDrawPrimitives = 0;
 			tess.numVertexes = 0;
 			tess.numIndexes = 0;
 		}
@@ -10019,7 +10013,7 @@ static void RB_RenderDebugUtils()
 				Vector4Set(quadVerts[3], ia->scissorX, ia->scissorY + ia->scissorHeight - 1, 0, 1);
 				Tess_InstantQuad(quadVerts);
 			}
-			else if(r_shadows->integer == 3 && glDepthBoundsEXT)
+			else if(r_shadows->integer == SHADOWING_STENCIL && glDepthBoundsEXT)
 			{
 				if(ia->noDepthBoundsTest)
 				{
@@ -10115,6 +10109,7 @@ static void RB_RenderDebugUtils()
 			GLSL_SetUniform_ModelMatrix(&tr.reflectionShader_C, backEnd.orientation.transformMatrix);
 			GLSL_SetUniform_ModelViewProjectionMatrix(&tr.reflectionShader_C, glState.modelViewProjectionMatrix[glState.stackIndex]);
 
+			tess.multiDrawPrimitives = 0;
 			tess.numIndexes = 0;
 			tess.numVertexes = 0;
 
@@ -10157,6 +10152,7 @@ static void RB_RenderDebugUtils()
 			Tess_UpdateVBOs(ATTR_POSITION | ATTR_NORMAL);
 			Tess_DrawElements();
 
+			tess.multiDrawPrimitives = 0;
 			tess.numIndexes = 0;
 			tess.numVertexes = 0;
 		}
@@ -10376,6 +10372,7 @@ static void RB_RenderDebugUtils()
 
 			GL_VertexAttribsState(ATTR_POSITION);
 
+			tess.multiDrawPrimitives = 0;
 			tess.numVertexes = node->volumeVerts;
 			tess.numIndexes = node->volumeIndexes;
 
@@ -10607,7 +10604,7 @@ static void RB_RenderView(void)
 #endif
 		RB_RenderLightOcclusionQueries();
 
-		if(r_shadows->integer >= 4)
+		if(r_shadows->integer >= SHADOWING_VSM16)
 		{
 			// render dynamic shadowing and lighting using shadow mapping
 			RB_RenderInteractionsDeferredShadowMapped();
@@ -10872,7 +10869,7 @@ static void RB_RenderView(void)
 		clearBits = GL_DEPTH_BUFFER_BIT;
 
 		/*
-		   if(r_measureOverdraw->integer || r_shadows->integer == 3)
+		   if(r_measureOverdraw->integer || r_shadows->integer == SHADOWING_STENCIL)
 		   {
 		   clearBits |= GL_STENCIL_BUFFER_BIT;
 		   }
@@ -10942,7 +10939,7 @@ static void RB_RenderView(void)
 
 		if(!r_showDeferredRender->integer)
 		{
-			if(r_shadows->integer >= 4)
+			if(r_shadows->integer >= SHADOWING_VSM16)
 			{
 				// render dynamic shadowing and lighting using shadow mapping
 				RB_RenderInteractionsDeferredShadowMapped();
@@ -11088,7 +11085,7 @@ static void RB_RenderView(void)
 		// clear relevant buffers
 		clearBits = GL_DEPTH_BUFFER_BIT;
 
-		if(r_measureOverdraw->integer || r_shadows->integer == 3)
+		if(r_measureOverdraw->integer || r_shadows->integer == SHADOWING_STENCIL)
 		{
 			clearBits |= GL_STENCIL_BUFFER_BIT;
 		}
@@ -11158,7 +11155,7 @@ static void RB_RenderView(void)
 		// try to cull lights using hardware occlusion queries
 		RB_RenderLightOcclusionQueries();
 
-		if(r_shadows->integer >= 4)
+		if(r_shadows->integer >= SHADOWING_VSM16)
 		{
 			// render dynamic shadowing and lighting using shadow mapping
 			RB_RenderInteractionsShadowMapped();
@@ -11166,7 +11163,7 @@ static void RB_RenderView(void)
 			// render player shadows if any
 			//RB_RenderInteractionsDeferredInverseShadows();
 		}
-		else if(r_shadows->integer == 3)
+		else if(r_shadows->integer == SHADOWING_STENCIL)
 		{
 			// render dynamic shadowing and lighting using stencil shadow volumes
 			RB_RenderInteractionsStencilShadowed();
@@ -11465,6 +11462,7 @@ void RE_StretchRaw(int x, int y, int w, int h, int cols, int rows, const byte * 
 	   glEnd();
 	 */
 
+	tess.multiDrawPrimitives = 0;
 	tess.numVertexes = 0;
 	tess.numIndexes = 0;
 
@@ -11519,6 +11517,7 @@ void RE_StretchRaw(int x, int y, int w, int h, int cols, int rows, const byte * 
 
 	Tess_DrawElements();
 
+	tess.multiDrawPrimitives = 0;
 	tess.numVertexes = 0;
 	tess.numIndexes = 0;
 

@@ -51,11 +51,9 @@ frame.
 
 static float    frontlerp, backlerp;
 static float    torsoFrontlerp, torsoBacklerp;
-static int     *triangles, *boneRefs, *pIndexes;
+static int     *boneRefs, *pIndexes;
 static int      indexes;
 static int      baseIndex, baseVertex, oldIndexes;
-static int      numVerts;
-static mdmVertex_t *v;
 static mdxBoneFrame_t bones[MDX_MAX_BONES], rawBones[MDX_MAX_BONES], oldBones[MDX_MAX_BONES];
 static char     validBones[MDX_MAX_BONES];
 static char     newBones[MDX_MAX_BONES];
@@ -137,10 +135,11 @@ R_CullModel
 */
 static int R_CullModel(trRefEntity_t * ent)
 {
-	vec3_t          bounds[2];
 	mdxHeader_t    *oldFrameHeader, *newFrameHeader;
 	mdxFrame_t     *oldFrame, *newFrame;
 	int             i;
+	vec3_t          v;
+	vec3_t          transformed;
 
 	newFrameHeader = R_GetModelByHandle(ent->e.frameModel)->mdx;
 	oldFrameHeader = R_GetModelByHandle(ent->e.oldframeModel)->mdx;
@@ -157,6 +156,28 @@ static int R_CullModel(trRefEntity_t * ent)
 	oldFrame = (mdxFrame_t *) ((byte *) oldFrameHeader + oldFrameHeader->ofsFrames +
 							   ent->e.oldframe * (int)(sizeof(mdxBoneFrameCompressed_t)) * oldFrameHeader->numBones +
 							   ent->e.oldframe * sizeof(mdxFrame_t));
+
+	// calculate a bounding box in the current coordinate system
+	for(i = 0; i < 3; i++)
+	{
+		ent->localBounds[0][i] = oldFrame->bounds[0][i] < newFrame->bounds[0][i] ? oldFrame->bounds[0][i] : newFrame->bounds[0][i];
+		ent->localBounds[1][i] = oldFrame->bounds[1][i] > newFrame->bounds[1][i] ? oldFrame->bounds[1][i] : newFrame->bounds[1][i];
+	}
+
+	// setup world bounds for intersection tests
+	ClearBounds(ent->worldBounds[0], ent->worldBounds[1]);
+
+	for(i = 0; i < 8; i++)
+	{
+		v[0] = ent->localBounds[i & 1][0];
+		v[1] = ent->localBounds[(i >> 1) & 1][1];
+		v[2] = ent->localBounds[(i >> 2) & 1][2];
+
+		// transform local bounds vertices into world space
+		R_LocalPointToWorld(v, transformed);
+
+		AddPointToBounds(transformed, ent->worldBounds[0], ent->worldBounds[1]);
+	}
 
 	// cull bounding sphere ONLY if this is not an upscaled entity
 	if(!ent->e.nonNormalizedAxes)
@@ -212,21 +233,16 @@ static int R_CullModel(trRefEntity_t * ent)
 		}
 	}
 
-	// calculate a bounding box in the current coordinate system
-	for(i = 0; i < 3; i++)
-	{
-		bounds[0][i] = oldFrame->bounds[0][i] < newFrame->bounds[0][i] ? oldFrame->bounds[0][i] : newFrame->bounds[0][i];
-		bounds[1][i] = oldFrame->bounds[1][i] > newFrame->bounds[1][i] ? oldFrame->bounds[1][i] : newFrame->bounds[1][i];
-	}
-
-	switch (R_CullLocalBox(bounds))
+	switch (R_CullLocalBox(ent->localBounds))
 	{
 		case CULL_IN:
 			tr.pc.c_box_cull_mdx_in++;
 			return CULL_IN;
+
 		case CULL_CLIP:
 			tr.pc.c_box_cull_mdx_clip++;
 			return CULL_CLIP;
+
 		case CULL_OUT:
 		default:
 			tr.pc.c_box_cull_mdx_out++;
@@ -337,6 +353,96 @@ static int R_ComputeFogNum(trRefEntity_t * ent)
 }
 */
 
+static shader_t *GetMDMSurfaceShader(const trRefEntity_t * ent, mdmSurfaceIntern_t * mdmSurface)
+{
+	shader_t       *shader = NULL;
+
+	if(ent->e.customShader)
+	{
+		shader = R_GetShaderByHandle(ent->e.customShader);
+	}
+	else if(ent->e.customSkin > 0 && ent->e.customSkin < tr.numSkins)
+	{
+		skin_t         *skin;
+		int             hash;
+		int             j;
+
+		skin = R_GetSkinByHandle(ent->e.customSkin);
+
+		// match the surface name to something in the skin file
+		shader = tr.defaultShader;
+
+#if 1
+		// Q3A way
+		
+		// match the surface name to something in the skin file
+		shader = tr.defaultShader;
+		for(j = 0; j < skin->numSurfaces; j++)
+		{
+			// the names have both been lowercased
+			if(!strcmp(skin->surfaces[j]->name, mdmSurface->name))
+			{
+				shader = skin->surfaces[j]->shader;
+				break;
+			}
+		}
+#else
+		if(ent->e.renderfx & RF_BLINK)
+		{
+			char           *s = va("%s_b", surface->name);	// append '_b' for 'blink'
+
+			hash = Com_HashKey(s, strlen(s));
+			for(j = 0; j < skin->numSurfaces; j++)
+			{
+				if(hash != skin->surfaces[j]->hash)
+				{
+					continue;
+				}
+				if(!strcmp(skin->surfaces[j]->name, s))
+				{
+					shader = skin->surfaces[j]->shader;
+					break;
+				}
+			}
+		}
+
+		if(shader == tr.defaultShader)
+		{
+			// blink reference in skin was not found
+			hash = Com_HashKey(surface->name, sizeof(surface->name));
+			for(j = 0; j < skin->numSurfaces; j++)
+			{
+				// the names have both been lowercased
+				if(hash != skin->surfaces[j]->hash)
+				{
+					continue;
+				}
+				if(!strcmp(skin->surfaces[j]->name, surface->name))
+				{
+					shader = skin->surfaces[j]->shader;
+					break;
+				}
+			}
+		}
+#endif
+
+		if(shader == tr.defaultShader)
+		{
+			ri.Printf(PRINT_DEVELOPER, "WARNING: no shader for surface %s in skin %s\n", mdmSurface->name, skin->name);
+		}
+		else if(shader->defaultShader)
+		{
+			ri.Printf(PRINT_DEVELOPER, "WARNING: shader %s in skin %s not found\n", shader->name, skin->name);
+		}
+	}
+	else
+	{
+		shader = R_GetShaderByHandle(mdmSurface->shaderIndex);
+	}
+
+	return shader;
+}
+
 /*
 ==============
 R_MDM_AddAnimSurfaces
@@ -344,29 +450,29 @@ R_MDM_AddAnimSurfaces
 */
 void R_MDM_AddAnimSurfaces(trRefEntity_t * ent)
 {
-	mdmHeader_t    *header;
-	mdmSurface_t   *surface;
+	mdmModel_t     *mdm;
+	mdmSurfaceIntern_t   *mdmSurface;
 	shader_t       *shader = 0;
-	int             i, /*fogNum,*/ cull;
+	int             i /*fogNum*/;
 	qboolean        personalModel;
 
 	// don't add third_person objects if not in a portal
 	personalModel = (ent->e.renderfx & RF_THIRD_PERSON) && !tr.viewParms.isPortal;
 
-	header = tr.currentModel->mdm;
+	mdm = tr.currentModel->mdm;
 
 	// cull the entire model if merged bounding box of both frames
 	// is outside the view frustum.
-	cull = R_CullModel(ent);
-	if(cull == CULL_OUT)
+	ent->cull = R_CullModel(ent);
+	if(ent->cull == CULL_OUT)
 	{
 		return;
 	}
 
 	// set up lighting now that we know we aren't culled
-	if(!personalModel || r_shadows->integer > 1)
+	if(!personalModel || r_shadows->integer > SHADOWING_BLOB)
 	{
-		R_SetupEntityLighting(&tr.refdef, ent);
+		R_SetupEntityLighting(&tr.refdef, ent, NULL);
 	}
 
 	
@@ -375,17 +481,18 @@ void R_MDM_AddAnimSurfaces(trRefEntity_t * ent)
 
 
 	// draw all surfaces
-#if 0
-	if(r_vboModels->integer && model->numVBOSurfaces)
+	if(r_vboModels->integer && mdm->numVBOSurfaces && glConfig2.vboVertexSkinningAvailable)// && ent->e.skeleton.type == SK_ABSOLUTE))
 	{
-		int             i;
-		srfVBOMesh_t   *vboSurface;
+		int             i, j;
+		srfVBOMDMMesh_t *vboSurface;
 		shader_t       *shader;
 
-		for(i = 0; i < model->numVBOSurfaces; i++)
+		for(i = 0; i < mdm->numVBOSurfaces; i++)
 		{
-			vboSurface = model->vboSurfaces[i];
-			shader = vboSurface->shader;
+			vboSurface = mdm->vboSurfaces[i];
+			mdmSurface = vboSurface->mdmSurface;
+
+			shader = GetMDMSurfaceShader(ent, mdmSurface);
 
 			// don't add third_person objects if not viewing through a portal
 			if(!personalModel)
@@ -395,105 +502,180 @@ void R_MDM_AddAnimSurfaces(trRefEntity_t * ent)
 		}
 	}
 	else
-#endif
 	{
-		surface = (mdmSurface_t *) ((byte *) header + header->ofsSurfaces);
-		for(i = 0; i < header->numSurfaces; i++)
+		for(i = 0, mdmSurface = mdm->surfaces; i < mdm->numSurfaces; i++, mdmSurface++)
 		{
-			if(ent->e.customShader)
-			{
-				shader = R_GetShaderByHandle(ent->e.customShader);
-			}
-			else if(ent->e.customSkin > 0 && ent->e.customSkin < tr.numSkins)
-			{
-				skin_t         *skin;
-				int             hash;
-				int             j;
-
-				skin = R_GetSkinByHandle(ent->e.customSkin);
-
-				// match the surface name to something in the skin file
-				shader = tr.defaultShader;
-
-
-#if 1
-				// Q3A way
-				
-				// match the surface name to something in the skin file
-				shader = tr.defaultShader;
-				for(j = 0; j < skin->numSurfaces; j++)
-				{
-					// the names have both been lowercased
-					if(!strcmp(skin->surfaces[j]->name, surface->name))
-					{
-						shader = skin->surfaces[j]->shader;
-						break;
-					}
-				}
-#else
-				if(ent->e.renderfx & RF_BLINK)
-				{
-					char           *s = va("%s_b", surface->name);	// append '_b' for 'blink'
-
-					hash = Com_HashKey(s, strlen(s));
-					for(j = 0; j < skin->numSurfaces; j++)
-					{
-						if(hash != skin->surfaces[j]->hash)
-						{
-							continue;
-						}
-						if(!strcmp(skin->surfaces[j]->name, s))
-						{
-							shader = skin->surfaces[j]->shader;
-							break;
-						}
-					}
-				}
-
-				if(shader == tr.defaultShader)
-				{
-					// blink reference in skin was not found
-					hash = Com_HashKey(surface->name, sizeof(surface->name));
-					for(j = 0; j < skin->numSurfaces; j++)
-					{
-						// the names have both been lowercased
-						if(hash != skin->surfaces[j]->hash)
-						{
-							continue;
-						}
-						if(!strcmp(skin->surfaces[j]->name, surface->name))
-						{
-							shader = skin->surfaces[j]->shader;
-							break;
-						}
-					}
-				}
-#endif
-
-				if(shader == tr.defaultShader)
-				{
-					ri.Printf(PRINT_DEVELOPER, "WARNING: no shader for surface %s in skin %s\n", surface->name, skin->name);
-				}
-				else if(shader->defaultShader)
-				{
-					ri.Printf(PRINT_DEVELOPER, "WARNING: shader %s in skin %s not found\n", shader->name, skin->name);
-				}
-			}
-			else
-			{
-				shader = R_GetShaderByHandle(surface->shaderIndex);
-			}
+			shader = GetMDMSurfaceShader(ent, mdmSurface);
 
 			// don't add third_person objects if not viewing through a portal
 			if(!personalModel)
 			{
-				R_AddDrawSurf((void *)surface, shader, -1);
+				R_AddDrawSurf((void *)mdmSurface, shader, -1);
 			}
-
-			surface = (mdmSurface_t *) ((byte *) surface + surface->ofsEnd);
 		}
 	}
 }
+
+
+/*
+=================
+R_AddMDMInteractions
+=================
+*/
+void R_AddMDMInteractions(trRefEntity_t * ent, trRefLight_t * light)
+{
+	int             i;
+	mdmModel_t     *model = 0;
+	mdmSurfaceIntern_t *mdmSurface = 0;
+	shader_t       *shader = 0;
+	int             lod;
+	qboolean        personalModel;
+	byte            cubeSideBits;
+	interactionType_t iaType = IA_DEFAULT;
+
+	// cull the entire model if merged bounding box of both frames
+	// is outside the view frustum and we don't care about proper shadowing
+	if(ent->cull == CULL_OUT)
+	{
+		if(r_shadows->integer <= SHADOWING_PLANAR || light->l.noShadows)
+			return;
+		else
+			iaType = IA_SHADOWONLY;
+	}
+
+	// avoid drawing of certain objects
+#if defined(USE_REFENTITY_NOSHADOWID)
+	if(light->l.inverseShadows)
+	{
+		if(iaType != IA_LIGHTONLY && (light->l.noShadowID && (light->l.noShadowID != ent->e.noShadowID)))
+			return;
+	}
+	else
+	{
+		if(iaType != IA_LIGHTONLY && (light->l.noShadowID && (light->l.noShadowID == ent->e.noShadowID)))
+			return;
+	}
+#endif
+
+	// don't add third_person objects if not in a portal
+	personalModel = (ent->e.renderfx & RF_THIRD_PERSON) && !tr.viewParms.isPortal;
+
+	model = tr.currentModel->mdm;
+
+	// do a quick AABB cull
+	if(!BoundsIntersect(light->worldBounds[0], light->worldBounds[1], ent->worldBounds[0], ent->worldBounds[1]))
+	{
+		tr.pc.c_dlightSurfacesCulled += model->numSurfaces;
+		return;
+	}
+
+	// do a more expensive and precise light frustum cull
+	if(!r_noLightFrustums->integer)
+	{
+		if(R_CullLightWorldBounds(light, ent->worldBounds) == CULL_OUT)
+		{
+			tr.pc.c_dlightSurfacesCulled += model->numSurfaces;
+			return;
+		}
+	}
+
+	cubeSideBits = R_CalcLightCubeSideBits(light, ent->worldBounds);
+
+	// generate interactions with all surfaces
+	if(r_vboModels->integer && model->numVBOSurfaces && glConfig2.vboVertexSkinningAvailable)
+	{
+		int             i;
+		srfVBOMDMMesh_t *vboSurface;
+		shader_t       *shader;
+
+		if(r_shadows->integer == SHADOWING_STENCIL)
+		{
+			// add shadow interactions because we cannot use shadow volumes with static VBOs ..
+			for(i = 0, mdmSurface = model->surfaces; i < model->numSurfaces; i++, mdmSurface++)
+			{
+				shader = GetMDMSurfaceShader(ent, mdmSurface);
+
+				// skip all surfaces that don't matter for lighting only pass
+				if(shader->isSky || !shader->interactLight || shader->noShadows)
+					continue;
+
+				// we will add shadows even if the main object isn't visible in the view
+
+				// don't add third_person objects if not viewing through a portal
+				if(!personalModel)
+				{
+					R_AddLightInteraction(light, (void *)mdmSurface, shader, cubeSideBits, IA_SHADOWONLY);
+					tr.pc.c_dlightSurfaces++;
+				}
+			}
+
+			// use static VBOs for lighting only
+			for(i = 0; i < model->numVBOSurfaces; i++)
+			{
+				vboSurface = model->vboSurfaces[i];
+				mdmSurface = vboSurface->mdmSurface;
+
+				shader = GetMDMSurfaceShader(ent, mdmSurface);
+
+				// skip all surfaces that don't matter for lighting only pass
+				if(shader->isSky || (!shader->interactLight && shader->noShadows))
+					continue;
+
+				// don't add third_person objects if not viewing through a portal
+				if(!personalModel)
+				{
+					R_AddLightInteraction(light, (void *)vboSurface, shader, cubeSideBits, IA_LIGHTONLY);
+					tr.pc.c_dlightSurfaces++;
+				}
+			}
+		}
+		else
+		{
+			// static VBOs are fine for lighting and shadow mapping
+			for(i = 0; i < model->numVBOSurfaces; i++)
+			{
+				vboSurface = model->vboSurfaces[i];
+				mdmSurface = vboSurface->mdmSurface;
+				
+				shader = GetMDMSurfaceShader(ent, mdmSurface);
+
+				// skip all surfaces that don't matter for lighting only pass
+				if(shader->isSky || (!shader->interactLight && shader->noShadows))
+					continue;
+
+				// we will add shadows even if the main object isn't visible in the view
+
+				// don't add third_person objects if not viewing through a portal
+				if(!personalModel)
+				{
+					R_AddLightInteraction(light, (void *)vboSurface, shader, cubeSideBits, iaType);
+					tr.pc.c_dlightSurfaces++;
+				}
+			}
+		}
+	}
+	else
+	{
+		for(i = 0, mdmSurface = model->surfaces; i < model->numSurfaces; i++, mdmSurface++)
+		{
+			shader = GetMDMSurfaceShader(ent, mdmSurface);
+
+			// skip all surfaces that don't matter for lighting only pass
+			if(shader->isSky || (!shader->interactLight && shader->noShadows))
+				continue;
+
+			// we will add shadows even if the main object isn't visible in the view
+
+			// don't add third_person objects if not viewing through a portal
+			if(!personalModel)
+			{
+				R_AddLightInteraction(light, (void *)mdmSurface, shader, cubeSideBits, iaType);
+				tr.pc.c_dlightSurfaces++;
+			}
+		}
+	}
+}
+
 
 __inline void LocalMatrixTransformVector(vec3_t in, vec3_t mat[3], vec3_t out)
 {
@@ -1331,6 +1513,7 @@ R_BonesStillValid
 */
 static qboolean R_BonesStillValid(const refEntity_t * refent)
 {
+#if 1
 	if(lastBoneEntity.hModel != refent->hModel)
 	{
 		return qfalse;
@@ -1387,6 +1570,9 @@ static qboolean R_BonesStillValid(const refEntity_t * refent)
 	}
 
 	return qtrue;
+#else
+	return qfalse;
+#endif
 }
 
 
@@ -1611,13 +1797,15 @@ static void R_CalcBones(const refEntity_t * refent, int *boneList, int numBones)
 Tess_MDM_SurfaceAnim
 ==============
 */
-void Tess_MDM_SurfaceAnim(mdmSurface_t * surface)
+void Tess_MDM_SurfaceAnim(mdmSurfaceIntern_t * surface)
 {
 #if 1
 	int             i, j, k;
 	refEntity_t    *refent;
 	int            *boneList;
-	mdmHeader_t    *header;
+	mdmModel_t     *mdm;
+	md5Vertex_t    *v;
+	srfTriangle_t  *tri; //triangles,
 
 #ifdef DBG_PROFILE_BONES
 	int             di = 0, dt, ldt;
@@ -1627,8 +1815,8 @@ void Tess_MDM_SurfaceAnim(mdmSurface_t * surface)
 #endif
 
 	refent = &backEnd.currentEntity->e;
-	boneList = (int *)((byte *) surface + surface->ofsBoneReferences);
-	header = (mdmHeader_t *) ((byte *) surface + surface->ofsHeader);
+	boneList = surface->boneReferences;
+	mdm = surface->model;
 
 	R_CalcBones((const refEntity_t *)refent, boneList, surface->numBoneReferences);
 
@@ -1637,9 +1825,9 @@ void Tess_MDM_SurfaceAnim(mdmSurface_t * surface)
 		// calculate LOD
 		//
 		// TODO: lerp the radius and origin
-		VectorAdd(refent->origin, frame->localOrigin, vec);
+	VectorAdd(refent->origin, frame->localOrigin, vec);
 	lodRadius = frame->radius;
-	lodScale = R_CalcMDMLod(refent, vec, lodRadius, header->lodBias, header->lodScale);
+	lodScale = R_CalcMDMLod(refent, vec, lodRadius, mdm->lodBias, mdm->lodScale);
 
 	// ydnar: debug code
 	//% lodScale = 0.15;
@@ -1647,6 +1835,9 @@ void Tess_MDM_SurfaceAnim(mdmSurface_t * surface)
 //DBG_SHOWTIME
 
 //----(SA)  modification to allow dead skeletal bodies to go below minlod (experiment)
+#if 1
+	render_count = surface->numVerts;
+#else
 	if(refent->reFlags & REFLAG_DEAD_LOD)
 	{
 		if(lodScale < 0.35)
@@ -1667,6 +1858,7 @@ void Tess_MDM_SurfaceAnim(mdmSurface_t * surface)
 			}
 		}
 	}
+#endif
 //----(SA)  end
 
 
@@ -1684,28 +1876,31 @@ void Tess_MDM_SurfaceAnim(mdmSurface_t * surface)
 
 	Tess_CheckOverflow(render_count, surface->numTriangles * 3);
 
-//DBG_SHOWTIME
 
-	//
-	// setup triangle list
-	//
-	// ydnar: no need to do this twice
-	//% RB_CheckOverflow( surface->numVerts, surface->numTriangles * 3);
-
-//DBG_SHOWTIME
-
-	collapse_map = (int *)((byte *) surface + surface->ofsCollapseMap);
-	triangles = (int *)((byte *) surface + surface->ofsTriangles);
-	indexes = surface->numTriangles * 3;
 	baseIndex = tess.numIndexes;
 	baseVertex = tess.numVertexes;
-	oldIndexes = baseIndex;
 
+	// setup triangle list
+
+#if 1
+	for(i = 0, tri = surface->triangles; i < surface->numTriangles; i++, tri++)
+	{
+		tess.indexes[tess.numIndexes + i * 3 + 0] = tess.numVertexes + tri->indexes[0];
+		tess.indexes[tess.numIndexes + i * 3 + 1] = tess.numVertexes + tri->indexes[1];
+		tess.indexes[tess.numIndexes + i * 3 + 2] = tess.numVertexes + tri->indexes[2];
+	}
+	
+	tess.numIndexes += surface->numTriangles * 3;
 	tess.numVertexes += render_count;
 
-	pIndexes = &tess.indexes[baseIndex];
+#else
 
-//DBG_SHOWTIME
+	collapse_map = surface->collapseMap;
+	triangles = surface->triangles;
+	indexes = surface->numTriangles * 3;
+	oldIndexes = baseIndex;
+
+	pIndexes = &tess.indexes[baseIndex];
 
 	if(render_count == surface->numVerts)
 	{
@@ -1760,36 +1955,34 @@ void Tess_MDM_SurfaceAnim(mdmSurface_t * surface)
 
 		baseIndex = tess.numIndexes;
 	}
+#endif
 
-//DBG_SHOWTIME
+	
 
-	//
 	// deform the vertexes by the lerped bones
-	//
-	numVerts = surface->numVerts;
-	v = (mdmVertex_t *) ((byte *) surface + surface->ofsVerts);
+
+	v = surface->verts;
 	tempVert = (float *)(&tess.xyz[baseVertex][0]);
 	tempNormal = (float *)(&tess.normals[baseVertex][0]);
-	for(j = 0; j < render_count; j++, tempVert += 4, tempNormal += 4)
+	for(j = 0; j < render_count; j++, tempVert += 4, tempNormal += 4, v++)
 	{
-		mdmWeight_t    *w;
+		md5Weight_t    *w;
 
 		VectorClear(tempVert);
 
-		w = v->weights;
-		for(k = 0; k < v->numWeights; k++, w++)
+		for(k = 0; k < v->numWeights; k++)
 		{
+			w = v->weights[k];
+
 			bone = &bones[w->boneIndex];
 			LocalAddScaledMatrixTransformVectorTranslate(w->offset, w->boneWeight, bone->matrix, bone->translation, tempVert);
 		}
 		tempVert[3] = 1;
 
-		LocalMatrixTransformVector(v->normal, bones[v->weights[0].boneIndex].matrix, tempNormal);
+		LocalMatrixTransformVector(v->normal, bones[v->weights[0]->boneIndex].matrix, tempNormal);
 
 		tess.texCoords[baseVertex + j][0] = v->texCoords[0];
 		tess.texCoords[baseVertex + j][1] = v->texCoords[1];
-
-		v = (mdmVertex_t *) &v->weights[v->numWeights];
 	}
 
 	DBG_SHOWTIME
@@ -1810,9 +2003,9 @@ void Tess_MDM_SurfaceAnim(mdmSurface_t * surface)
 
 		for(i = 0; i < render_count; i++)
 		{
-			VectorClear(tess.tangents[tess.numVertexes + i]);
-			VectorClear(tess.binormals[tess.numVertexes + i]);
-			VectorClear(tess.normals[tess.numVertexes + i]);
+			VectorClear(tess.tangents[baseVertex + i]);
+			VectorClear(tess.binormals[baseVertex + i]);
+			VectorClear(tess.normals[baseVertex + i]);
 		}
 
 		numIndexes = tess.numIndexes - oldIndexes;
@@ -2153,16 +2346,70 @@ void Tess_MDM_SurfaceAnim(mdmSurface_t * surface)
 #endif // entire function block
 }
 
+
+
+/*
+==============
+Tess_SurfaceVBOMDMMesh
+==============
+*/
+void Tess_SurfaceVBOMDMMesh(srfVBOMDMMesh_t * surface)
+{
+	int             i;
+	mdmModel_t     *mdmModel;
+	mdmSurfaceIntern_t *mdmSurface;
+	matrix_t        m, m2;	//, m3
+	refEntity_t    *refent;
+
+	GLimp_LogComment("--- Tess_SurfaceVBOMDMMesh ---\n");
+
+	if(!surface->vbo || !surface->ibo)
+		return;
+
+	Tess_EndBegin();
+
+	R_BindVBO(surface->vbo);
+	R_BindIBO(surface->ibo);
+
+	tess.numIndexes += surface->numIndexes;
+	tess.numVertexes += surface->numVerts;
+
+	mdmModel = surface->mdmModel;
+	mdmSurface = surface->mdmSurface;
+
+	refent = &backEnd.currentEntity->e;	
+
+	// RB: R_CalcBones requires the bone references from the original mdmSurface_t because
+	// the GPU vertex skinning only requires a subset which does not reference the parent bones of the vertex weights.
+	R_CalcBones((const refEntity_t *)refent, mdmSurface->boneReferences, mdmSurface->numBoneReferences);
+
+	tess.vboVertexSkinning = qtrue;
+
+	for(i = 0; i < surface->numBoneRemap; i++)
+	{
+		MatrixFromVectorsFLU(m, bones[surface->boneRemapInverse[i]].matrix[0],
+								bones[surface->boneRemapInverse[i]].matrix[1],
+								bones[surface->boneRemapInverse[i]].matrix[2]);
+
+		MatrixTranspose(m, m2);
+
+		MatrixSetupTransformFromRotation(tess.boneMatrices[i], m2, bones[surface->boneRemapInverse[i]].translation);
+	}
+
+	Tess_End();
+}
+
+
 /*
 ===============
 R_GetBoneTag
 ===============
 */
-int R_MDM_GetBoneTag(orientation_t * outTag, mdmHeader_t * mdm, int startTagIndex, const refEntity_t * refent,
+int R_MDM_GetBoneTag(orientation_t * outTag, mdmModel_t * mdm, int startTagIndex, const refEntity_t * refent,
 					 const char *tagName)
 {
 	int             i, j;
-	mdmTag_t       *pTag;
+	mdmTagIntern_t *pTag;
 	int            *boneList;
 
 	if(startTagIndex > mdm->numTags)
@@ -2172,24 +2419,14 @@ int R_MDM_GetBoneTag(orientation_t * outTag, mdmHeader_t * mdm, int startTagInde
 	}
 
 	// find the correct tag
+	pTag = (mdmTagIntern_t *) &mdm->tags[startTagIndex];
 
-	pTag = (mdmTag_t *) ((byte *) mdm + mdm->ofsTags);
-
-	if(startTagIndex)
-	{
-		for(i = 0; i < startTagIndex; i++)
-		{
-			pTag = (mdmTag_t *) ((byte *) pTag + pTag->ofsEnd);
-		}
-	}
-
-	for(i = startTagIndex; i < mdm->numTags; i++)
+	for(i = startTagIndex; i < mdm->numTags; i++, pTag++)
 	{
 		if(!strcmp(pTag->name, tagName))
 		{
 			break;
 		}
-		pTag = (mdmTag_t *) ((byte *) pTag + pTag->ofsEnd);
 	}
 
 	if(i >= mdm->numTags)
@@ -2199,8 +2436,7 @@ int R_MDM_GetBoneTag(orientation_t * outTag, mdmHeader_t * mdm, int startTagInde
 	}
 
 	// calc the bones
-
-	boneList = (int *)((byte *) pTag + pTag->ofsBoneReferences);
+	boneList = pTag->boneReferences;
 	R_CalcBones(refent, boneList, pTag->numBoneReferences);
 
 	// now extract the orientation for the bone that represents our tag

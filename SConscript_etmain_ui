@@ -25,13 +25,11 @@ ui_list = [
 'src/shared/q_shared.c',
 ]
 
-local_env = g_env.Clone()
-
-local_env.Append( CPPDEFINES = [ 'UIDLL' ] )
+local_env = env.Clone()
+local_env.Append(CPPDEFINES = ['UIDLL'])
+#local_env['LINK'] = local_env['CC']
 
 source_list = ui_list
 
-local_env['LINK'] = local_env['CC']
-
-ret = local_env.SharedLibrary( target = 'ui', source = source_list )
-Return( 'ret' )
+local_env.SharedLibrary( target = 'ui', source = source_list )
+local_env.InstallAs('#etmain/ui.mp.%s.so' % dll_cpu, 'libui.so')

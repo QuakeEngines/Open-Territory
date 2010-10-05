@@ -43,7 +43,7 @@ void R_AddBrushModelInteractions(trRefEntity_t * ent, trRefLight_t * light)
 	// and we don't care about proper shadowing
 	if(ent->cull == CULL_OUT)
 	{
-		if(r_shadows->integer <= 2 || light->l.noShadows)
+		if(r_shadows->integer <= SHADOWING_PLANAR || light->l.noShadows)
 			return;
 		else
 			iaType = IA_SHADOWONLY;
@@ -155,7 +155,7 @@ LIGHT SAMPLING
 R_SetupEntityLightingGrid
 =================
 */
-static void R_SetupEntityLightingGrid(trRefEntity_t * ent)
+static void R_SetupEntityLightingGrid(trRefEntity_t * ent, vec3_t forcedOrigin)
 {
 	vec3_t          lightOrigin;
 	int             pos[3];
@@ -167,16 +167,23 @@ static void R_SetupEntityLightingGrid(trRefEntity_t * ent)
 	vec3_t          direction;
 	float           totalFactor;
 
-	if(ent->e.renderfx & RF_LIGHTING_ORIGIN)
+	if(forcedOrigin)
 	{
-		// seperate lightOrigins are needed so an object that is
-		// sinking into the ground can still be lit, and so
-		// multi-part models can be lit identically
-		VectorCopy(ent->e.lightingOrigin, lightOrigin);
+		VectorCopy(forcedOrigin, lightOrigin);
 	}
 	else
 	{
-		VectorCopy(ent->e.origin, lightOrigin);
+		if(ent->e.renderfx & RF_LIGHTING_ORIGIN)
+		{
+			// seperate lightOrigins are needed so an object that is
+			// sinking into the ground can still be lit, and so
+			// multi-part models can be lit identically
+			VectorCopy(ent->e.lightingOrigin, lightOrigin);
+		}
+		else
+		{
+			VectorCopy(ent->e.origin, lightOrigin);
+		}
 	}
 
 	VectorSubtract(lightOrigin, tr.world->lightGridOrigin, lightOrigin);
@@ -322,10 +329,10 @@ Calculates all the lighting values that will be used
 by the Calc_* functions
 =================
 */
-void R_SetupEntityLighting(const trRefdef_t * refdef, trRefEntity_t * ent)
+void R_SetupEntityLighting(const trRefdef_t * refdef, trRefEntity_t * ent, vec3_t forcedOrigin)
 {
 	vec3_t          lightDir;
-	vec3_t          lightOrigin;
+	//vec3_t          lightOrigin;
 	float           d;
 
 	// lighting calculations
@@ -335,26 +342,36 @@ void R_SetupEntityLighting(const trRefdef_t * refdef, trRefEntity_t * ent)
 	}
 	ent->lightingCalculated = qtrue;
 
-	// trace a sample point down to find ambient light
-	if(ent->e.renderfx & RF_LIGHTING_ORIGIN)
+	/*
+	if(forcedOrigin)
 	{
-		// seperate lightOrigins are needed so an object that is
-		// sinking into the ground can still be lit, and so
-		// multi-part models can be lit identically
-		VectorCopy(ent->e.lightingOrigin, lightOrigin);
+		VectorCopy(forcedOrigin, lightOrigin);
 	}
 	else
 	{
-		VectorCopy(ent->e.origin, lightOrigin);
+		// trace a sample point down to find ambient light
+		if(ent->e.renderfx & RF_LIGHTING_ORIGIN)
+		{
+			// seperate lightOrigins are needed so an object that is
+			// sinking into the ground can still be lit, and so
+			// multi-part models can be lit identically
+			VectorCopy(ent->e.lightingOrigin, lightOrigin);
+		}
+		else
+		{
+			VectorCopy(ent->e.origin, lightOrigin);
+		}
 	}
+	*/
 
 	// if NOWORLDMODEL, only use dynamic lights (menu system, etc)
-	if(!(refdef->rdflags & RDF_NOWORLDMODEL) && tr.world->lightGridData)
+	if(!(refdef->rdflags & RDF_NOWORLDMODEL) && tr.world && tr.world->lightGridData)
 	{
-		R_SetupEntityLightingGrid(ent);
+		R_SetupEntityLightingGrid(ent, forcedOrigin);
 	}
 	else
 	{
+#if 0
 		if(!(refdef->rdflags & RDF_NOWORLDMODEL))
 		{
 			ent->ambientLight[0] = tr.worldEntity.ambientLight[0];
@@ -379,17 +396,32 @@ void R_SetupEntityLighting(const trRefdef_t * refdef, trRefEntity_t * ent)
 		{
 			VectorCopy(tr.sunDirection, ent->lightDir);
 		}
+#else
+		//% ent->ambientLight[0] = ent->ambientLight[1] = ent->ambientLight[2] = tr.identityLight * 150;
+		//% ent->directedLight[0] = ent->directedLight[1] = ent->directedLight[2] = tr.identityLight * 150;
+		//% VectorCopy( tr.sunDirection, ent->lightDir );
+		ent->ambientLight[0] = tr.identityLight * (64.0f / 255.0f);
+		ent->ambientLight[1] = tr.identityLight * (64.0f / 255.0f);
+		ent->ambientLight[2] = tr.identityLight * (96.0f / 255.0f);
+
+		ent->directedLight[0] = tr.identityLight * (255.0f / 255.0f);
+		ent->directedLight[1] = tr.identityLight * (232.0f / 255.0f);
+		ent->directedLight[2] = tr.identityLight * (224.0f / 255.0f);
+
+		VectorSet(ent->lightDir, -1, 1, 1.25);
+		VectorNormalize(ent->lightDir);
+#endif
 	}
 
 #if 1
 	if(ent->e.hilightIntensity)
 	{
 		// level of intensity was set because the item was looked at
-		ent->ambientLight[0] += tr.identityLight * 128 * ent->e.hilightIntensity;
-		ent->ambientLight[1] += tr.identityLight * 128 * ent->e.hilightIntensity;
-		ent->ambientLight[2] += tr.identityLight * 128 * ent->e.hilightIntensity;
+		ent->ambientLight[0] += tr.identityLight * 0.5f * ent->e.hilightIntensity;
+		ent->ambientLight[1] += tr.identityLight * 0.5f * ent->e.hilightIntensity;
+		ent->ambientLight[2] += tr.identityLight * 0.5f * ent->e.hilightIntensity;
 	}
-	else if((ent->e.renderfx & RF_MINLIGHT) && VectorLength(ent->ambientLight) <= 0)
+	else if((ent->e.renderfx & RF_MINLIGHT))// && VectorLength(ent->ambientLight) <= 0)
 	{
 		// give everything a minimum light add
 		ent->ambientLight[0] += tr.identityLight * 0.125f;
@@ -409,20 +441,22 @@ void R_SetupEntityLighting(const trRefdef_t * refdef, trRefEntity_t * ent)
 	}
 #endif
 
-	if(r_debugLight->integer)
+	if(ent->e.entityNum < MAX_CLIENTS && (refdef->rdflags & RDF_SNOOPERVIEW))
 	{
-		LogLight(ent);
+		VectorSet(ent->ambientLight, 0.96f, 0.96f, 0.96f);	// allow a little room for flicker from directed light
 	}
 
-	// transform the direction to local space
-	d = VectorLength(ent->directedLight);
-	VectorScale(ent->lightDir, d, lightDir);
-	VectorNormalize(lightDir);
 
-	// keep it in world space
-//	ent->lightDir[0] = DotProduct(lightDir, ent->e.axis[0]);
-//	ent->lightDir[1] = DotProduct(lightDir, ent->e.axis[1]);
-//	ent->lightDir[2] = DotProduct(lightDir, ent->e.axis[2]);
+	// Tr3B: keep it in world space
+
+	// transform the direction to local space
+	//% d = VectorLength(ent->directedLight);
+	//% VectorScale(ent->lightDir, d, lightDir);
+	//% VectorNormalize(lightDir);
+
+	//% ent->lightDir[0] = DotProduct(lightDir, ent->e.axis[0]);
+	//% ent->lightDir[1] = DotProduct(lightDir, ent->e.axis[1]);
+	//%	ent->lightDir[2] = DotProduct(lightDir, ent->e.axis[2]);
 }
 
 /*
@@ -440,7 +474,7 @@ int R_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec
 
 	Com_Memset(&ent, 0, sizeof(ent));
 	VectorCopy(point, ent.e.origin);
-	R_SetupEntityLightingGrid(&ent);
+	R_SetupEntityLightingGrid(&ent, NULL);
 	VectorCopy(ent.ambientLight, ambientLight);
 	VectorCopy(ent.directedLight, directedLight);
 	VectorCopy(ent.lightDir, lightDir);
@@ -738,6 +772,7 @@ void R_SetupLightFrustum(trRefLight_t * light)
 		if(glConfig.smpActive)
 			ri.Error(ERR_FATAL, "R_SetupLightFrustum: FIXME SMP");
 
+		tess.multiDrawPrimitives = 0;
 		tess.numIndexes = 0;
 		tess.numVertexes = 0;
 
@@ -893,6 +928,7 @@ void R_SetupLightFrustum(trRefLight_t * light)
 				break;
 		}
 
+		tess.multiDrawPrimitives = 0;
 		tess.numIndexes = 0;
 		tess.numVertexes = 0;
 	}
@@ -1144,7 +1180,7 @@ qboolean R_AddLightInteraction(trRefLight_t * light, surfaceType_t * surface, sh
 #if defined(USE_D3D10)
 	// TODO
 #else
-	if(r_shadows->integer == 3 && glDepthBoundsEXT)
+	if(r_shadows->integer == SHADOWING_STENCIL && glDepthBoundsEXT)
 	{
 		ia->depthNear = light->depthNear;
 		ia->depthFar = light->depthFar;
@@ -1386,7 +1422,7 @@ void R_SetupLightScissor(trRefLight_t * light)
 	}
 
 #if 0
-	if(r_shadows->integer != 3)
+	if(r_shadows->integer != SHADOWING_STENCIL)
 	{
 		// we don't need it for any other mode ...
 		return;
@@ -1538,7 +1574,7 @@ void R_SetupLightDepthBounds(trRefLight_t * light)
 #if defined(USE_D3D10)
 	// TODO
 #else
-	if(r_shadows->integer == 3 && glDepthBoundsEXT)
+	if(r_shadows->integer == SHADOWING_STENCIL && glDepthBoundsEXT)
 	{
 		tr.pc.c_depthBoundsTestsRejected++;
 
@@ -1636,7 +1672,7 @@ byte R_CalcLightCubeSideBits(trRefLight_t * light, vec3_t worldBounds[2])
 	return cubeSideBits;
 #endif
 
-	if(light->l.rlType != RL_OMNI || r_shadows->integer < 4 || r_noShadowPyramids->integer)
+	if(light->l.rlType != RL_OMNI || r_shadows->integer < SHADOWING_VSM16 || r_noShadowPyramids->integer)
 		return CUBESIDE_CLIPALL;
 
 	cubeSideBits = 0;

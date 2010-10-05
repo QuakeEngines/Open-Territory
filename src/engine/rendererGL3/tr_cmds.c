@@ -61,6 +61,11 @@ void R_PerformanceCounters(void)
 				  tr.pc.c_CHCTime,
 				  backEnd.pc.c_vboVertexBuffers, backEnd.pc.c_vboIndexBuffers,
 				  backEnd.pc.c_vboVertexes, backEnd.pc.c_vboIndexes / 3);
+
+		ri.Printf(PRINT_ALL, "%i multidraws %i primitives %i tris\n",
+				  backEnd.pc.c_multiDrawElements,
+				  backEnd.pc.c_multiDrawPrimitives,
+				  backEnd.pc.c_multiVboIndexes / 3);
 	}
 	else if(r_speeds->integer == 2)
 	{
@@ -620,7 +625,7 @@ void RE_BeginFrame(stereoFrame_t stereoFrame)
 			ri.Cvar_Set("r_measureOverdraw", "0");
 			r_measureOverdraw->modified = qfalse;
 		}
-		else if(r_shadows->integer == 3)
+		else if(r_shadows->integer == SHADOWING_STENCIL)
 		{
 			ri.Printf(PRINT_ALL, "Warning: stencil shadows and overdraw measurement are mutually exclusive\n");
 			ri.Cvar_Set("r_measureOverdraw", "0");

@@ -36,14 +36,14 @@ class idBuildCurl( scons_utils.idSetupBase ):
 
 build = idBuildCurl()
 build.curl_dir = 'src/libs/curl-7.12.2'
-if ( local_curl == 1 ):
+if env['debug'] != '0':
 	build.debug = 1
 	target_name = '#' + build.curl_dir + '/lib/.libs/libcurl-debug.a'
 else:
 	build.debug = 0
 	target_name = '#' + build.curl_dir + '/lib/.libs/libcurl-release.a'
 
-g_env.Command( target_name, None, Action( build.Compile ) )
+env.Command( target_name, None, Action( build.Compile ) )
 
 curl_libs = [ target_name ]
 Return( 'curl_libs' )

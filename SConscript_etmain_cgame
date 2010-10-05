@@ -64,20 +64,11 @@ cgame_list = [
 'src/shared/q_shared.c',
 ]
 
-local_env = g_env.Clone()
-
-local_env.Append( CPPDEFINES = [ 'CGAMEDLL' ] )
-
 source_list = cgame_list
 
-local_env['LINK'] = local_env['CC']
+local_env = env.Clone()
+local_env.Append( CPPDEFINES = [ 'CGAMEDLL' ] )
+#local_env['LINK'] = local_env['CC']
+local_env.SharedLibrary( target = 'cgame', source = source_list )
+local_env.InstallAs('#etmain/cgame.mp.%s.so' % dll_cpu, 'libcgame.so')
 
-# GAMERANGER isn't exported in all usage paths
-try:
-	if ( GAMERANGER == '1' ):
-		local_env.Append( CPPDEFINES = [ 'GAMERANGER' ] )
-except:
-	pass
-
-ret = local_env.SharedLibrary( target = 'cgame', source = source_list )
-Return( 'ret' )

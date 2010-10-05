@@ -19,7 +19,7 @@
 			Name="Debug|Win32"
 			OutputDirectory=".\Debug"
 			IntermediateDirectory=".\Debug"
-			ConfigurationType="2"
+			ConfigurationType="4"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			UseOfMFC="0"
 			ATLMinimizesCRunTimeLibraryUsage="false"
@@ -44,7 +44,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="..\..\libs\ft2\include;..\sdl\include;..\..\libs\zlib;..\..\libs\glew\include"
-				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOWS;BUILD_FREETYPE;FT2_BUILD_LIBRARY;GLEW_STATIC"
+				PreprocessorDefinitions="_DEBUG;WIN32;_WINDOWS;BUILD_FREETYPE;FT2_BUILD_LIBRARY;GLEW_STATIC;REF_HARD_LINKED"
 				MinimalRebuild="true"
 				RuntimeLibrary="1"
 				PrecompiledHeaderFile=""
@@ -68,18 +68,11 @@
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
-				Name="VCLinkerTool"
+				Name="VCLibrarianTool"
 				AdditionalDependencies="opengl32.lib"
-				OutputFile="../../../rendererGL3.dll"
-				ModuleDefinitionFile="rendererGL3.def"
-				GenerateDebugInformation="true"
-				ProgramDatabaseFile="../../../rendererGL3.pdb"
 			/>
 			<Tool
 				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
@@ -91,9 +84,6 @@
 				Name="VCFxCopTool"
 			/>
 			<Tool
-				Name="VCAppVerifierTool"
-			/>
-			<Tool
 				Name="VCPostBuildEventTool"
 			/>
 		</Configuration>
@@ -101,7 +91,7 @@
 			Name="Release|Win32"
 			OutputDirectory=".\Release"
 			IntermediateDirectory=".\Release"
-			ConfigurationType="2"
+			ConfigurationType="4"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			UseOfMFC="0"
 			ATLMinimizesCRunTimeLibraryUsage="false"
@@ -127,7 +117,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				AdditionalIncludeDirectories="..\freetype\include;..\sdl\include;..\..\libs\zlib;..\..\libs\glew\include"
-				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;BUILD_FREETYPE;FT2_BUILD_LIBRARY;GLEW_STATIC"
+				PreprocessorDefinitions="NDEBUG;WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;BUILD_FREETYPE;FT2_BUILD_LIBRARY;GLEW_STATIC;REF_HARD_LINKED"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="false"
@@ -152,16 +142,11 @@
 				Name="VCPreLinkEventTool"
 			/>
 			<Tool
-				Name="VCLinkerTool"
+				Name="VCLibrarianTool"
 				AdditionalDependencies="opengl32.lib"
-				OutputFile="../../../rendererGL3.dll"
-				ModuleDefinitionFile="rendererGL3.def"
 			/>
 			<Tool
 				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
 			/>
 			<Tool
 				Name="VCXDCMakeTool"
@@ -171,9 +156,6 @@
 			/>
 			<Tool
 				Name="VCFxCopTool"
-			/>
-			<Tool
-				Name="VCAppVerifierTool"
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
@@ -292,7 +274,23 @@
 				>
 			</File>
 			<File
+				RelativePath=".\tr_model_md5.c"
+				>
+			</File>
+			<File
 				RelativePath=".\tr_model_mdc.c"
+				>
+			</File>
+			<File
+				RelativePath=".\tr_model_mdm.c"
+				>
+			</File>
+			<File
+				RelativePath=".\tr_model_psk.c"
+				>
+			</File>
+			<File
+				RelativePath=".\tr_model_skel.c"
 				>
 			</File>
 			<File
@@ -1150,331 +1148,331 @@
 			Name="Shaders"
 			>
 			<File
-				RelativePath="..\..\etmain\glsl\bloom_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\bloom_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\bloom_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\bloom_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\blurX_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\blurX_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\blurX_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\blurX_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\blurY_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\blurY_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\blurY_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\blurY_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\cameraEffects_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\cameraEffects_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\cameraEffects_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\cameraEffects_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\contrast_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\contrast_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\contrast_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\contrast_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\debugShadowMap_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\debugShadowMap_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\debugShadowMap_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\debugShadowMap_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deferredLighting_DBS_directional_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deferredLighting_DBS_directional_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deferredLighting_DBS_directional_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deferredLighting_DBS_directional_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deferredLighting_DBS_omni_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deferredLighting_DBS_omni_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deferredLighting_DBS_omni_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deferredLighting_DBS_omni_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deferredLighting_DBS_proj_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deferredLighting_DBS_proj_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deferredLighting_DBS_proj_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deferredLighting_DBS_proj_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deferredShadowing_proj_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deferredShadowing_proj_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deferredShadowing_proj_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deferredShadowing_proj_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deluxeMapping_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deluxeMapping_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\deluxeMapping_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\deluxeMapping_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\depthFill_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\depthFill_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\depthFill_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\depthFill_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\depthOfField_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\depthOfField_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\depthOfField_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\depthOfField_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\depthTest_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\depthTest_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\depthTest_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\depthTest_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\depthToColor_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\depthToColor_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\depthToColor_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\depthToColor_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\dispersion_C_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\dispersion_C_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\dispersion_C_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\dispersion_C_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\forwardLighting_DBS_directional_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\forwardLighting_DBS_directional_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\forwardLighting_DBS_directional_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\forwardLighting_DBS_directional_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\forwardLighting_DBS_omni_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\forwardLighting_DBS_omni_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\forwardLighting_DBS_omni_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\forwardLighting_DBS_omni_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\forwardLighting_DBS_post_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\forwardLighting_DBS_post_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\forwardLighting_DBS_post_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\forwardLighting_DBS_post_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\forwardLighting_DBS_proj_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\forwardLighting_DBS_proj_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\forwardLighting_DBS_proj_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\forwardLighting_DBS_proj_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\genericSingle_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\genericSingle_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\genericSingle_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\genericSingle_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\geometricFill_DBS_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\geometricFill_DBS_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\geometricFill_DBS_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\geometricFill_DBS_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\heatHaze_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\heatHaze_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\heatHaze_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\heatHaze_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\lightMapping_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\lightMapping_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\lightMapping_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\lightMapping_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\lightVolume_omni_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\lightVolume_omni_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\lightVolume_omni_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\lightVolume_omni_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\liquid_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\liquid_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\liquid_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\liquid_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\portal_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\portal_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\portal_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\portal_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\reflection_C_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\reflection_C_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\reflection_C_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\reflection_C_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\reflection_CB_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\reflection_CB_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\reflection_CB_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\reflection_CB_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\refraction_C_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\refraction_C_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\refraction_C_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\refraction_C_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\rotoscope_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\rotoscope_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\rotoscope_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\rotoscope_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\screen_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\screen_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\screen_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\screen_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\screenSpaceAmbientOcclusion_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\screenSpaceAmbientOcclusion_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\screenSpaceAmbientOcclusion_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\screenSpaceAmbientOcclusion_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\shadowExtrude_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\shadowExtrude_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\shadowExtrude_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\shadowExtrude_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\shadowFill_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\shadowFill_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\shadowFill_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\shadowFill_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\skybox_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\skybox_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\skybox_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\skybox_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\toneMapping_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\toneMapping_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\toneMapping_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\toneMapping_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\uniformFog_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\uniformFog_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\uniformFog_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\uniformFog_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\vertexLighting_DBS_entity_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\vertexLighting_DBS_entity_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\vertexLighting_DBS_entity_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\vertexLighting_DBS_entity_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\vertexLighting_DBS_world_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\vertexLighting_DBS_world_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\vertexLighting_DBS_world_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\vertexLighting_DBS_world_vp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\volumetricFog_fp.glsl"
+				RelativePath="..\..\..\etmain\glsl\volumetricFog_fp.glsl"
 				>
 			</File>
 			<File
-				RelativePath="..\..\etmain\glsl\volumetricFog_vp.glsl"
+				RelativePath="..\..\..\etmain\glsl\volumetricFog_vp.glsl"
 				>
 			</File>
 		</Filter>

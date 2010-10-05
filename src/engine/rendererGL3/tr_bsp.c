@@ -107,7 +107,7 @@ static void R_ColorShiftLightingBytes(byte in[4], byte out[4])
 	int             shift, r, g, b;
 
 	// shift the color data based on overbright range
-	shift = r_mapOverBrightBits->integer - tr.overbrightBits;
+	shift = tr.mapOverBrightBits - tr.overbrightBits;
 
 	// shift the data based on overbright range
 	r = in[0] << shift;
@@ -144,7 +144,7 @@ static void R_ColorShiftLightingFloats(const vec4_t in, vec4_t out)
 	int             shift, r, g, b;
 
 	// shift the color data based on overbright range
-	shift = r_mapOverBrightBits->integer - tr.overbrightBits;
+	shift = tr.mapOverBrightBits - tr.overbrightBits;
 
 	// shift the data based on overbright range
 	r = ((byte)(in[0] * 255)) << shift;
@@ -4443,6 +4443,8 @@ static void R_CreateWorldVBO()
 								   ATTR_NORMAL | ATTR_COLOR | ATTR_PAINTCOLOR | ATTR_LIGHTDIRECTION, VBO_USAGE_STATIC);
 #endif
 
+	s_worldData.ibo = R_CreateIBO2(va("staticBspModel0_IBO %i", 0), numTriangles, triangles, VBO_USAGE_STATIC);
+
 	endTime = ri.Milliseconds();
 	ri.Printf(PRINT_ALL, "world VBO calculation time = %5.2f seconds\n", (endTime - startTime) / 1000.0);
 
@@ -4457,7 +4459,8 @@ static void R_CreateWorldVBO()
 			//if(r_vboFaces->integer && srf->numVerts && srf->numTriangles)
 			{
 				srf->vbo = s_worldData.vbo;
-				srf->ibo = R_CreateIBO2(va("staticBspModel0_planarSurface_IBO %i", k), srf->numTriangles, triangles + srf->firstTriangle, VBO_USAGE_STATIC);
+				srf->ibo = s_worldData.ibo;
+				//srf->ibo = R_CreateIBO2(va("staticBspModel0_planarSurface_IBO %i", k), srf->numTriangles, triangles + srf->firstTriangle, VBO_USAGE_STATIC);
 			}
 		}
 		else if(*surface->data == SF_GRID)
@@ -4467,7 +4470,8 @@ static void R_CreateWorldVBO()
 			//if(r_vboCurves->integer && srf->numVerts && srf->numTriangles)
 			{
 				srf->vbo = s_worldData.vbo;
-				srf->ibo = R_CreateIBO2(va("staticBspModel0_curveSurface_IBO %i", k), srf->numTriangles, triangles + srf->firstTriangle, VBO_USAGE_STATIC);
+				srf->ibo = s_worldData.ibo;
+				//srf->ibo = R_CreateIBO2(va("staticBspModel0_curveSurface_IBO %i", k), srf->numTriangles, triangles + srf->firstTriangle, VBO_USAGE_STATIC);
 			}
 		}
 		else if(*surface->data == SF_TRIANGLES)
@@ -4477,7 +4481,8 @@ static void R_CreateWorldVBO()
 			//if(r_vboTriangles->integer && srf->numVerts && srf->numTriangles)
 			{
 				srf->vbo = s_worldData.vbo;
-				srf->ibo = R_CreateIBO2(va("staticBspModel0_triangleSurface_IBO %i", k), srf->numTriangles, triangles + srf->firstTriangle, VBO_USAGE_STATIC);
+				srf->ibo = s_worldData.ibo;
+				//srf->ibo = R_CreateIBO2(va("staticBspModel0_triangleSurface_IBO %i", k), srf->numTriangles, triangles + srf->firstTriangle, VBO_USAGE_STATIC);
 			}
 		}
 	}
@@ -5183,6 +5188,7 @@ static void R_LoadNodesAndLeafs(lump_t * nodeLump, lump_t * leafLump)
 
 		glGenQueriesARB(MAX_VIEWS, out->occlusionQueryObjects);
 
+		tess.multiDrawPrimitives = 0;
 		tess.numIndexes = 0;
 		tess.numVertexes = 0;
 
@@ -5237,6 +5243,7 @@ static void R_LoadNodesAndLeafs(lump_t * nodeLump, lump_t * leafLump)
 	ri.Hunk_FreeTempMemory(triangles);
 	ri.Hunk_FreeTempMemory(verts);
 
+	tess.multiDrawPrimitives = 0;
 	tess.numIndexes = 0;
 	tess.numVertexes = 0;
 #endif
@@ -5390,6 +5397,11 @@ void R_LoadLightGrid(lump_t * l)
 	}
 
 	w->numLightGridPoints = w->lightGridBounds[0] * w->lightGridBounds[1] * w->lightGridBounds[2];
+
+	ri.Printf(PRINT_ALL, "grid size (%i %i %i)\n", (int)w->lightGridSize[0], (int)w->lightGridSize[1],
+				  (int)w->lightGridSize[2]);
+	ri.Printf(PRINT_ALL, "grid bounds (%i %i %i)\n", (int)w->lightGridBounds[0], (int)w->lightGridBounds[1],
+				  (int)w->lightGridBounds[2]);
 
 	if(l->filelen != w->numLightGridPoints * sizeof(dgridPoint_t))
 	{
@@ -5642,6 +5654,12 @@ void R_LoadEntities(lump_t * l)
 			ri.Printf(PRINT_ALL, "map features directional light mapping\n");
 			tr.worldDeluxeMapping = qtrue;
 			continue;
+		}
+
+		// check for mapOverBrightBits override
+		else if(!Q_stricmp(keyname, "mapOverBrightBits"))
+		{
+			tr.mapOverBrightBits = Q_bound(0, atof(value), 3);
 		}
 
 		// check for deluxe mapping provided by NetRadiant's q3map2
@@ -6584,7 +6602,7 @@ static void R_KillRedundantInteractions(trRefLight_t * light)
 	bspSurface_t   *surface;
 	vec3_t          localBounds[2];
 
-	if(r_shadows->integer <= 2)
+	if(r_shadows->integer <= SHADOWING_PLANAR)
 		return;
 
 	if(!light->firstInteractionCache)
@@ -6610,7 +6628,7 @@ static void R_KillRedundantInteractions(trRefLight_t * light)
 			continue;
 
 		// HACK: allow fancy alphatest shadows with shadow mapping
-		if(r_shadows->integer >= 4 && surface->shader->alphaTest)
+		if(r_shadows->integer >= SHADOWING_VSM16 && surface->shader->alphaTest)
 			continue;
 
 		for(iaCache2 = light->firstInteractionCache; iaCache2; iaCache2 = iaCache2->next)
@@ -6843,7 +6861,7 @@ static void R_CreateVBOLightMeshes(trRefLight_t * light)
 	if(!r_vboLighting->integer)
 		return;
 
-	if(r_deferredShading->integer && r_shadows->integer <= 3)
+	if(r_deferredShading->integer && r_shadows->integer <= SHADOWING_STENCIL)
 		return;
 
 	if(!light->firstInteractionCache)
@@ -7142,7 +7160,7 @@ static void R_CreateVBOShadowMeshes(trRefLight_t * light)
 	if(!r_vboShadows->integer)
 		return;
 
-	if(r_shadows->integer < 4)
+	if(r_shadows->integer < SHADOWING_VSM16)
 		return;
 
 	if(!light->firstInteractionCache)
@@ -7504,7 +7522,7 @@ static void R_CreateVBOShadowCubeMeshes(trRefLight_t * light)
 	if(!r_vboShadows->integer)
 		return;
 
-	if(r_shadows->integer < 4)
+	if(r_shadows->integer < SHADOWING_VSM16)
 		return;
 
 	if(!light->firstInteractionCache)
@@ -7825,6 +7843,7 @@ static void R_CreateVBOShadowCubeMeshes(trRefLight_t * light)
 /*
 ===============
 R_CreateVBOShadowVolume
+
 Go through all static interactions of this light and create a new VBO shadow volume surface,
 so we can render all static shadows of this light using a single glDrawElements call
 without any renderer backend batching
@@ -7862,7 +7881,7 @@ static void R_CreateVBOShadowVolume(trRefLight_t * light)
 
 	srfVBOShadowVolume_t *shadowSurf;
 
-	if(r_shadows->integer != 3)
+	if(r_shadows->integer != SHADOWING_STENCIL)
 		return;
 
 	if(!r_vboShadows->integer)
@@ -8211,7 +8230,7 @@ static void R_CalcInteractionCubeSideBits(trRefLight_t * light)
 	bspSurface_t   *surface;
 	vec3_t          localBounds[2];
 
-	if(r_shadows->integer <= 2)
+	if(r_shadows->integer <= SHADOWING_PLANAR)
 		return;
 
 	if(!light->firstInteractionCache)
@@ -8404,7 +8423,7 @@ void R_PrecacheInteractions()
 	ri.Printf(PRINT_ALL, "%i interactions precached\n", s_worldData.numInteractions);
 	ri.Printf(PRINT_ALL, "%i interactions were hidden in shadows\n", c_redundantInteractions);
 
-	if(r_shadows->integer >= 4)
+	if(r_shadows->integer >= SHADOWING_VSM16)
 	{
 		// only interesting for omni-directional shadow mapping
 		ri.Printf(PRINT_ALL, "%i omni pyramid tests\n", tr.pc.c_pyramidTests);

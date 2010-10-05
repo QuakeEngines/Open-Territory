@@ -176,6 +176,9 @@ rendererGL3_list = [
 'src/engine/rendererGL3/tr_model.c',
 'src/engine/rendererGL3/tr_model_md3.c',
 'src/engine/rendererGL3/tr_model_mdc.c',
+'src/engine/rendererGL3/tr_model_mdm.c',
+'src/engine/rendererGL3/tr_model_psk.c',
+'src/engine/rendererGL3/tr_model_skel.c',
 'src/engine/rendererGL3/tr_noise.c',
 'src/engine/rendererGL3/tr_scene.c',
 'src/engine/rendererGL3/tr_shade.c',
@@ -349,7 +352,7 @@ botlib_list = [
 	'src/engine/botlib/l_struct.c'
 ]
 
-botlib_env = g_env.Clone()
+botlib_env = env.Clone()
 botlib_env.Append( CPPDEFINES = [ 'BOTLIB' ] )
 
 botlib_objs = []
@@ -378,54 +381,69 @@ for i in botlib_list:
 #        snd_mixa = gas_env.StaticObject( 'src/engine/unix/snd_mixa.spp' )
 #
 
-splines_env = g_env.Clone()
-splines_lib = splines_env.StaticLibrary( splines_list )
+splines_env = env.Clone()
+splines_lib = splines_env.StaticLibrary(splines_list)
 
-local_env = g_env.Clone()
+local_env = env.Clone()
 
-if ( g_os == 'Linux' ):
-	local_env.Append( LIBS = [ 'dl' ] )
-	if ( local_dedicated == 0 ):
-		local_env.Append( LIBS = [ 'm', 'GL' ] )
-		local_env.Append( LIBPATH = [ '/usr/X11R6/lib' ] )
-		local_env.Append( CPPPATH = [ 'src/libs/curl-7.12.2/include' ] )
-		local_env.Append( CPPPATH = [ 'src/libs/glew/include' ] )
-		local_env.Append( CPPPATH = [ 'src/libs/zlib' ] )
-		local_env.Append( CPPDEFINES = [ 'REF_HARD_LINKED' ] )
-		local_env.Append( CPPDEFINES = [ 'PNG_NO_ASSEMBLER_CODE' ] )
+if g_os == 'Linux':
+	local_env.Append(LIBS = ['dl'])
+	if local_dedicated == 0:
+		local_env.Append(LIBS = ['m', 'GL'])
+		local_env.Append(LIBPATH = ['/usr/X11R6/lib'])
+		local_env.Append(CPPPATH = ['src/libs/curl-7.12.2/include'])
+		local_env.Append(CPPPATH = ['src/libs/glew/include'])
+		local_env.Append(CPPPATH = ['src/libs/zlib'])
+		local_env.Append(CPPDEFINES = ['REF_HARD_LINKED'])
+		local_env.Append(CPPDEFINES = ['PNG_NO_ASSEMBLER_CODE'])
 		local_env.ParseConfig('pkg-config --cflags --libs x11')
 		local_env.ParseConfig('pkg-config --cflags --libs xext')
 		local_env.ParseConfig('pkg-config --cflags --libs xxf86dga')
 		local_env.ParseConfig('pkg-config --cflags --libs xxf86vm')
+		
+		if env['curl'] == 'system':
+			local_env.ParseConfig('pkg-config --cflags --libs libcurl')
+		
 	else:
-		local_env.Append( CPPDEFINES = [ 'DEDICATED' ] )
-		local_env.Append( LIBS = [ 'm' ] )
+		local_env.Append(CPPDEFINES = ['DEDICATED'])
+		local_env.Append(LIBS = ['m'])
 
-	if gcc3 == 0:
-		g_env.Append(LINKFLAGS=[ os.popen( g_env['CXX'] + ' -print-file-name=libstdc++.a' ).read().rstrip() ])
-	else:
-		local_env['ENV']['CC'] = g_env['CC']
-		local_env['LINK'] = 'src/engine/unix/staticlinkcpp.sh'
-elif ( g_os == 'win32' ):
+	#if gcc3 == 0:
+	#	env.Append(LINKFLAGS=[ os.popen( env['CXX'] + ' -print-file-name=libstdc++.a' ).read().rstrip() ])
+	#else:
+		local_env['ENV']['CC'] = env['CC']
+		#local_env['LINK'] = 'src/engine/unix/staticlinkcpp.sh'
+		
+		
+		
+elif g_os == 'win32':
 	local_env.Append( LIBS = [ 'm', 'winmm', 'wsock32', 'gdi32', 'ole32', 'iphlpapi' ] )
 	if ( local_dedicated == 0 ):
 		local_env.Append( LIBS = [ 'dinput', 'dsound' ] )
 		local_env.Append( CPPPATH = [ 'curl-7.12.2/include' ] )
 	else:
 		local_env.Append( CPPDEFINES = [ 'DEDICATED' ] )
-	local_env['LINK'] = g_env['CXX']
-elif ( g_os == 'Darwin' ):
+	local_env['LINK'] = env['CXX']
+	
+	
+	
+elif g_os == 'Darwin':
 	local_env.Append( LINKFLAGS = [ '-framework', 'AGL', '-framework', 'OpenGL', '-framework', 'Carbon', '-framework', 'IOKit', '-framework', 'DrawSprocket', '-lcurl' ] )
 
-if ( MASTER != '' ):
-	local_env.Append( CPPDEFINES = [ 'MASTER_SERVER_NAME=\\"%s\\"' % MASTER ] )
+
+
+
+#if MASTER != '':
+#	local_env.Append( CPPDEFINES = [ 'MASTER_SERVER_NAME=\\"%s\\"' % MASTER ] )
 
 source_list = server_list + qcommon_list
-if ( g_os == 'Linux' ):
+if g_os == 'Linux':
 	source_list += linux_sources #+ snapvector + matha
-elif ( g_os == 'win32' ):
+	
+elif g_os == 'win32':
 	source_list += win32_sources
-elif ( g_os == 'Darwin' ):
+	
+elif g_os == 'Darwin':
 	if ( BUILD == 'release' ):
 		local_env.Append( CPPFLAGS = [ '-include', 'src/engine/mac/MacPrefix.h' ] )
 	else:
@@ -437,24 +455,39 @@ elif ( g_os == 'Darwin' ):
 
 source_list += botlib_objs
 
-if ( local_dedicated == 0 ):
+if local_dedicated == 0:
 	source_list += jpeg_list
 	source_list += png_list
 	source_list += zlib_list
 	source_list += openexr_list
 	source_list += rendererGL3_list
 	source_list += client_list
-	source_list += [ 'src/engine/qcommon/dl_main_curl.c' ]
+	source_list += ['src/engine/qcommon/dl_main_curl.c']
 	source_list += curl_lib
-	if ( g_os == 'Linux' ):
+	if g_os == 'Linux':
 		#source_list += snd_mixa
 		source_list += linux_full_sources
 		#source_list += staticx11_libs
-	if ( g_os == 'win32' ):
+	if g_os == 'win32':
 		source_list += win32_full_sources
 else:
-	source_list += [ 'src/engine/null/null_client.c', 'src/engine/null/null_input.c', 'src/engine/null/null_snddma.c', 'src/engine/qcommon/dl_main_stubs.c' ]
+	source_list += ['src/engine/null/null_client.c', 'src/engine/null/null_input.c', 'src/engine/null/null_snddma.c', 'src/engine/qcommon/dl_main_stubs.c']
 source_list += splines_lib
 
-ret = local_env.Program( target = 'et-xreal', source = source_list )
-Return( 'ret' )
+
+if local_dedicated == 0:
+	local_env.Program(target = 'etxreal', source = source_list)
+	
+	if g_os == 'win32':
+		env.InstallAs('#ETXreaL.exe', 'etxreal')
+	else:
+		env.InstallAs('#etxreal', 'etxreal')
+else:
+	local_env.Program(target = 'etxreal-dedicated', source = source_list)
+
+	if g_os == 'win32':
+		local_env.InstallAs('#ETXreaL-dedicated.exe', 'etxreal-dedicated')
+	else:
+		local_env.InstallAs('#etxreal-dedicated', 'etxreal-dedicated')
+
+

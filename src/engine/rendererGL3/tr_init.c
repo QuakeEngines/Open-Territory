@@ -1397,7 +1397,13 @@ void R_Register(void)
 	r_overBrightBits = ri.Cvar_Get("r_overBrightBits", "0", CVAR_CHEAT | CVAR_LATCH);
 	r_mapOverBrightBits = ri.Cvar_Get("r_mapOverBrightBits", "0", CVAR_CHEAT | CVAR_LATCH);
 #endif
+
+	AssertCvarRange(r_overBrightBits, 0, 1, qtrue);	// ydnar: limit to overbrightbits 1 (sorry 1337 players)
+	AssertCvarRange(r_mapOverBrightBits, 0, 3, qtrue);
+
 	r_intensity = ri.Cvar_Get("r_intensity", "1", CVAR_LATCH);
+	AssertCvarRange(r_intensity, 0, 1.5, qfalse);
+
 	r_singleShader = ri.Cvar_Get("r_singleShader", "0", CVAR_CHEAT | CVAR_LATCH);
 	r_stitchCurves = ri.Cvar_Get("r_stitchCurves", "1", CVAR_CHEAT | CVAR_LATCH);
 	r_debugShadowMaps = ri.Cvar_Get("r_debugShadowMaps", "0", CVAR_CHEAT);
@@ -1435,7 +1441,7 @@ void R_Register(void)
 	r_ambientScale = ri.Cvar_Get("r_ambientScale", "0.6", CVAR_CHEAT);
 	r_lightScale = ri.Cvar_Get("r_lightScale", "3", CVAR_CHEAT);
 
-	r_vboFaces = ri.Cvar_Get("r_vboFaces", "0", CVAR_CHEAT);
+	r_vboFaces = ri.Cvar_Get("r_vboFaces", "1", CVAR_CHEAT);
 	r_vboCurves = ri.Cvar_Get("r_vboCurves", "1", CVAR_CHEAT);
 	r_vboTriangles = ri.Cvar_Get("r_vboTriangles", "1", CVAR_CHEAT);
 	r_vboShadows = ri.Cvar_Get("r_vboShadows", "1", CVAR_CHEAT);
@@ -1446,7 +1452,7 @@ void R_Register(void)
 	r_vboVertexSkinning = ri.Cvar_Get("r_vboVertexSkinning", "1", CVAR_CHEAT | CVAR_LATCH);
 	r_vboSmoothNormals = ri.Cvar_Get("r_vboSmoothNormals", "1", CVAR_ARCHIVE | CVAR_LATCH);
 
-	r_mergeClusterSurfaces = ri.Cvar_Get("r_mergeClusterSurfaces", "1", CVAR_CHEAT);
+	r_mergeClusterSurfaces = ri.Cvar_Get("r_mergeClusterSurfaces", "0", CVAR_CHEAT);
 	r_mergeClusterFaces = ri.Cvar_Get("r_mergeClusterFaces", "1", CVAR_CHEAT);
 	r_mergeClusterCurves = ri.Cvar_Get("r_mergeClusterCurves", "1", CVAR_CHEAT);
 	r_mergeClusterTriangles = ri.Cvar_Get("r_mergeClusterTriangles", "1", CVAR_CHEAT);

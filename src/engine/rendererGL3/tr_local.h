@@ -561,6 +561,11 @@ typedef struct VBO_s
 	uint32_t        ofsBoneIndexes;
 	uint32_t        ofsBoneWeights;
 
+	uint32_t		sizeXYZ;
+	uint32_t		sizeTangents;
+	uint32_t		sizeBinormals;
+	uint32_t		sizeNormals;
+
 	int             attribs;
 } VBO_t;
 
@@ -2584,19 +2589,15 @@ typedef enum
 
 	SF_MDV,
 	SF_MDM,
-
-#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 	SF_MD5,
-#endif
 
 	SF_FLARE,
 	SF_ENTITY,					// beams, rails, lightning, etc that can be determined by entity
+
 	SF_VBO_MESH,
-
-#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 	SF_VBO_MD5MESH,
-#endif
-
+	SF_VBO_MDMMESH,
+	SF_VBO_MDVMESH,
 	SF_VBO_SHADOW_VOLUME,
 
 	SF_NUM_SURFACE_TYPES,
@@ -2910,6 +2911,45 @@ typedef struct srfVBOMD5Mesh_s
 	IBO_t          *ibo;
 } srfVBOMD5Mesh_t;
 
+typedef struct srfVBOMDMMesh_s
+{
+	surfaceType_t   surfaceType;
+
+	struct mdmModel_s *mdmModel;
+	struct mdmSurfaceIntern_s *mdmSurface;
+	struct shader_s *shader;	// FIXME move this to somewhere else
+
+	int				skinIndex;
+
+	int				numBoneRemap;
+	int				boneRemap[MAX_BONES];
+	int				boneRemapInverse[MAX_BONES];
+
+	// backEnd stats
+	int             numIndexes;
+	int             numVerts;
+
+	// static render data
+	VBO_t          *vbo;
+	IBO_t          *ibo;
+} srfVBOMDMMesh_t;
+
+typedef struct srfVBOMDVMesh_s
+{
+	surfaceType_t   surfaceType;
+
+	struct mdvModel_s *mdvModel;
+	struct mdvSurface_s *mdvSurface;
+
+	// backEnd stats
+	int             numIndexes;
+	int             numVerts;
+
+	// static render data
+	VBO_t          *vbo;
+	IBO_t          *ibo;
+} srfVBOMDVMesh_t;
+
 typedef struct srfVBOShadowVolume_s
 {
 	surfaceType_t   surfaceType;
@@ -3076,6 +3116,7 @@ typedef struct
 	int            *redundantShadowVerts;
 	int            *redundantShadowAlphaTestVerts;
 	VBO_t          *vbo;
+	IBO_t          *ibo;
 
 	int             numTriangles;
 	srfTriangle_t  *triangles;
@@ -3147,7 +3188,10 @@ typedef struct
 
 typedef struct
 {
-	float           xyz[3];
+	vec3_t          xyz;
+	vec3_t          normal;
+	vec3_t          tangent;
+	vec3_t          binormal;
 } mdvVertex_t;
 
 typedef struct
@@ -3155,7 +3199,7 @@ typedef struct
 	float           st[2];
 } mdvSt_t;
 
-typedef struct
+typedef struct mdvSurface_s
 {
 	surfaceType_t   surfaceType;
 
@@ -3186,7 +3230,7 @@ typedef struct mdvModel_s
 	mdvSurface_t   *surfaces;
 
 	int             numVBOSurfaces;
-	srfVBOMesh_t  **vboSurfaces;
+	srfVBOMDVMesh_t  **vboSurfaces;
 
 	int             numSkins;
 } mdvModel_t;
@@ -3272,6 +3316,73 @@ typedef struct md5Model_s
 } md5Model_t;
 
 
+
+
+
+
+typedef struct
+{
+	char            name[64];	// name of tag
+	vec3_t          axis[3];
+
+	int             boneIndex;
+	vec3_t          offset;
+
+	int             numBoneReferences;
+	int            *boneReferences;
+} mdmTagIntern_t;
+
+typedef struct mdmSurfaceIntern_s
+{
+	surfaceType_t   surfaceType;
+
+	char            name[MAX_QPATH];    // polyset name
+	char            shader[MAX_QPATH];
+	int             shaderIndex;	// for in-game use
+
+	int             minLod;
+
+	uint32_t        numVerts;
+	md5Vertex_t    *verts;
+
+	uint32_t        numTriangles;
+	srfTriangle_t  *triangles;
+
+//	uint32_t        numWeights;
+//	md5Weight_t    *weights;
+
+	int             numBoneReferences;
+	int            *boneReferences;
+
+	int            *collapseMap;	// numVerts many
+
+	struct mdmModel_s *model;
+} mdmSurfaceIntern_t;
+
+typedef struct mdmModel_s
+{
+//	uint16_t        numBones;
+//	md5Bone_t      *bones;
+
+	float           lodScale;
+	float           lodBias;
+
+	uint16_t		numTags;
+	mdmTagIntern_t *tags;
+
+	uint16_t        numSurfaces;
+	mdmSurfaceIntern_t *surfaces;
+
+	uint16_t        numVBOSurfaces;
+	srfVBOMDMMesh_t **vboSurfaces;
+
+	int				numBoneReferences;
+	int32_t        *boneReferences;
+
+	vec3_t          bounds[2];
+} mdmModel_t;
+
+
 typedef enum
 {
 	AT_BAD,
@@ -3343,6 +3454,13 @@ typedef struct
 
 } skelAnimation_t;
 
+typedef struct
+{
+	int             indexes[3];
+	md5Vertex_t    *vertexes[3];
+	qboolean		referenced;
+} skelTriangle_t;
+
 
 //======================================================================
 
@@ -3365,7 +3483,7 @@ typedef struct model_s
 	int             dataSize;	// just for listing purposes
 	bspModel_t     *bsp;		// only if type == MOD_BSP
 	mdvModel_t     *mdv[MD3_MAX_LODS];	// only if type == MOD_MESH
-	mdmHeader_t    *mdm;		// only if type == MOD_MDM
+	mdmModel_t     *mdm;		// only if type == MOD_MDM
 	mdxHeader_t    *mdx;		// only if type == MOD_MDX
 	md5Model_t     *md5;		// only if type == MOD_MD5
 
@@ -3495,6 +3613,7 @@ typedef struct
 	uint32_t        glStateBits;
 	uint32_t		vertexAttribsState;
 	uint32_t		vertexAttribPointersSet;
+	uint32_t		vertexAttribsFrame;		// offset for VBO vertex animations
 	shaderProgram_t *currentProgram;
 	FBO_t          *currentFBO;
 	VBO_t          *currentVBO;
@@ -3537,6 +3656,10 @@ typedef struct
 
 	int             c_deferredGBufferTime;
 	int             c_deferredLightingTime;
+
+	int				c_multiDrawElements;
+	int				c_multiDrawPrimitives;
+	int				c_multiVboIndexes;
 
 	int             msec;		// total msec for backend run
 } backEndCounters_t;
@@ -3785,6 +3908,7 @@ typedef struct
 
 	float           identityLight;	// 1.0 / ( 1 << overbrightBits )
 	int             overbrightBits;	// r_overbrightBits->integer, but set to 0 if no hw gamma
+	int				mapOverBrightBits;	// r_mapOverbrightBits->integer, but can be overriden by mapper using the worldspawn
 
 	orientationr_t  orientation;			// for current entity
 
@@ -4412,6 +4536,8 @@ typedef struct stageVars
 	matrix_t        texMatrices[MAX_TEXTURE_BUNDLES];
 } stageVars_t;
 
+#define MAX_MULTIDRAW_PRIMITIVES	1000
+
 typedef struct shaderCommands_s
 {
 	vec4_t          xyz[SHADER_MAX_VERTEXES];
@@ -4443,6 +4569,10 @@ typedef struct shaderCommands_s
 	uint32_t        numIndexes;
 	uint32_t        numVertexes;
 
+	GLsizei			multiDrawPrimitives;
+	glIndex_t*		multiDrawIndexes[MAX_MULTIDRAW_PRIMITIVES];
+	GLsizei			multiDrawCounts[MAX_MULTIDRAW_PRIMITIVES];
+
 	qboolean        vboVertexSkinning;
 	matrix_t        boneMatrices[MAX_BONES];
 
@@ -4469,6 +4599,7 @@ void            Tess_Begin(	void (*stageIteratorFunc)(),
 							int lightmapNum);
 // *INDENT-ON*
 void            Tess_End(void);
+void			Tess_EndBegin();
 void            Tess_DrawElements();
 void            Tess_CheckOverflow(int verts, int indexes);
 
@@ -4545,7 +4676,7 @@ LIGHTS, tr_light.c
 */
 
 void            R_AddBrushModelInteractions(trRefEntity_t * ent, trRefLight_t * light);
-void            R_SetupEntityLighting(const trRefdef_t * refdef, trRefEntity_t * ent);
+void            R_SetupEntityLighting(const trRefdef_t * refdef, trRefEntity_t * ent, vec3_t forcedOrigin);
 int             R_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir);
 
 void            R_SetupLightOrigin(trRefLight_t * light);
@@ -4788,9 +4919,14 @@ ANIMATED MODELS WOLF:ET  MDM/MDX
 */
 
 void            R_MDM_AddAnimSurfaces(trRefEntity_t * ent);
-void            Tess_MDM_SurfaceAnim(mdmSurface_t * surfType);
-int             R_MDM_GetBoneTag(orientation_t * outTag, mdmHeader_t * mdm, int startTagIndex, const refEntity_t * refent,
+void            R_AddMDMInteractions(trRefEntity_t * e, trRefLight_t * light);
+
+int             R_MDM_GetBoneTag(orientation_t * outTag, mdmModel_t * mdm, int startTagIndex, const refEntity_t * refent,
 								 const char *tagName);
+
+
+void            Tess_MDM_SurfaceAnim(mdmSurfaceIntern_t * surfType);
+void            Tess_SurfaceVBOMDMMesh(srfVBOMDMMesh_t * surfType);
 
 /*
 =============================================================

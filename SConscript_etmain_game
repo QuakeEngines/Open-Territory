@@ -79,15 +79,12 @@ qagame_list = [
 #for i in botai_list:
 #	botlib_ai.append( botai_env.StaticObject( os.path.join( 'botlib', i ) ) )
 
-local_env = g_env.Clone()
-
-local_env.Append( CPPDEFINES = [ 'GAMEDLL' ] )
-
-local_env['LINK'] = local_env['CC']
+local_env = env.Clone()
+local_env.Append(CPPDEFINES = ['GAMEDLL'])
+#local_env['LINK'] = local_env['CC']
 
 source_list = botai_list
 source_list += qagame_list
 
-#ret = local_env.Program( target = 'et', source = source_list )
-ret = local_env.SharedLibrary( target = 'qagame', source = source_list )
-Return( 'ret' )
+local_env.SharedLibrary( target = 'qagame', source = source_list)
+local_env.InstallAs('#etmain/qagame.mp.%s.so' % dll_cpu, 'libqagame.so')

@@ -233,7 +233,7 @@ static void R_AddInteractionSurface(bspSurface_t * surf, trRefLight_t * light)
 	// into this view
 	if(surf->viewCount != tr.viewCountNoReset)
 	{
-		if(r_shadows->integer <= 2 || light->l.noShadows)
+		if(r_shadows->integer <= SHADOWING_PLANAR || light->l.noShadows)
 			return;
 		else
 			iaType = IA_SHADOWONLY;
@@ -368,6 +368,7 @@ void R_AddBSPModelSurfaces(trRefEntity_t * ent)
 	int             i;
 	vec3_t          v;
 	vec3_t          transformed;
+	vec3_t			boundsCenter;
 
 	pModel = R_GetModelByHandle(ent->e.hModel);
 	bspModel = pModel->bsp;
@@ -377,6 +378,12 @@ void R_AddBSPModelSurfaces(trRefEntity_t * ent)
 	{
 		ent->localBounds[0][i] = bspModel->bounds[0][i];
 		ent->localBounds[1][i] = bspModel->bounds[1][i];
+	}
+
+	ent->cull = R_CullLocalBox(bspModel->bounds);
+	if(ent->cull == CULL_OUT)
+	{
+		return;
 	}
 
 	// setup world bounds for intersection tests
@@ -394,14 +401,11 @@ void R_AddBSPModelSurfaces(trRefEntity_t * ent)
 		AddPointToBounds(transformed, ent->worldBounds[0], ent->worldBounds[1]);
 	}
 
-	ent->cull = R_CullLocalBox(bspModel->bounds);
-	if(ent->cull == CULL_OUT)
-	{
-		return;
-	}
+	VectorAdd(ent->worldBounds[0], ent->worldBounds[1], boundsCenter);
+	VectorScale(boundsCenter, 0.5f, boundsCenter);
 
 	// Tr3B: BSP inline models should always use vertex lighting
-	R_SetupEntityLighting(&tr.refdef, ent);
+	R_SetupEntityLighting(&tr.refdef, ent, boundsCenter);
 
 	if(r_vboModels->integer && bspModel->numVBOSurfaces)
 	{
@@ -412,7 +416,7 @@ void R_AddBSPModelSurfaces(trRefEntity_t * ent)
 		{
 			vboSurface = bspModel->vboSurfaces[i];
 
-			R_AddDrawSurf((void *)vboSurface, vboSurface->shader, -1);//vboSurface->lightmapNum);
+			R_AddDrawSurf((void *)vboSurface, vboSurface->shader, vboSurface->lightmapNum);
 		}
 	}
 	else
@@ -591,7 +595,7 @@ static void R_RecursiveInteractionNode(bspNode_t * node, trRefLight_t * light, i
 
 	// Tr3B - even surfaces that belong to nodes that are outside of the view frustum
 	// can cast shadows into the view frustum
-	if(!r_nocull->integer && r_shadows->integer <= 2)
+	if(!r_nocull->integer && r_shadows->integer <= SHADOWING_PLANAR)
 	{
 		for(i = 0; i < FRUSTUM_PLANES; i++)
 		{
@@ -1328,6 +1332,7 @@ static void DrawNode_r(bspNode_t * node, int planeBits, int decalBits)
 
 			Tess_DrawElements();
 
+			tess.multiDrawPrimitives = 0;
 			tess.numIndexes = 0;
 			tess.numVertexes = 0;
 #endif
@@ -1486,6 +1491,7 @@ static void IssueMultiOcclusionQueries(link_t * multiQueue, link_t * individualQ
 
 		GL_VertexAttribsState(ATTR_POSITION);
 
+		tess.multiDrawPrimitives = 0;
 		tess.numVertexes = node->volumeVerts;
 		tess.numIndexes = node->volumeIndexes;
 
@@ -2528,7 +2534,7 @@ void R_AddPrecachedWorldInteractions(trRefLight_t * light)
 		shader_t       *shader;
 		bspSurface_t   *surface;
 
-		if(r_shadows->integer == 3)
+		if(r_shadows->integer == SHADOWING_STENCIL)
 		{
 			for(iaVBO = light->firstInteractionVBO; iaVBO; iaVBO = iaVBO->next)
 			{
@@ -2606,7 +2612,7 @@ void R_AddPrecachedWorldInteractions(trRefLight_t * light)
 			// into this view
 			if(surface->viewCount != tr.viewCountNoReset)
 			{
-				if(r_shadows->integer <= 3 || light->l.noShadows)
+				if(r_shadows->integer <= SHADOWING_STENCIL || light->l.noShadows)
 					continue;
 				else
 					iaType = IA_SHADOWONLY;
@@ -2635,7 +2641,7 @@ void R_AddPrecachedWorldInteractions(trRefLight_t * light)
 			// into this view
 			if(surface->viewCount != tr.viewCountNoReset)
 			{
-				if(r_shadows->integer <= 3 || light->l.noShadows)
+				if(r_shadows->integer <= SHADOWING_STENCIL || light->l.noShadows)
 					continue;
 				else
 					iaType = IA_SHADOWONLY;

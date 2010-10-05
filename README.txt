@@ -74,15 +74,22 @@ _______________________________
 3) GENERAL NOTES
 ______________________
 
+If you use a Nvidia card then keep the Nvidia Threaded Optimzation ON !!!
+
+
+This release does not contain Enemy Territory's game data, the game data is still
+covered by the original EULA and must be obeyed as usual.
 
 Wolfenstein: Enemy Territory is a free release, and can be downloaded from
 http://www.splashdamage.com/content/wolfenstein-enemy-territory-barracks
 
-This source release does not contain any game data, the game data is still
-covered by the original EULA and must be obeyed as usual.
-
 Install the latest version of the game for your platform to get the game data.
 
+
+For Techies Only: 
+If you want to test the engine with an OpenGL >= 3.2 core profile enabled then start it with: 
+	
+	> +set r_glCoreProfile 1
 
 ____________________________________________
 
@@ -102,7 +109,7 @@ __________________________________________________________
 
 1. Download and install the Visual C++ 2008 Express Edition.
 2. Use the VC9 solutions to compile what you need:
-	ET-XreaL/src/wolf.sln
+	ET-XreaL/src/engine/wolf.sln
 	ET-XreaL/src/tools/etxmap/etxmap.sln
 	ET-XreaL/src/tools/etxradiant/tools/vcprojects/ETXRadiant.sln
 
@@ -122,6 +129,10 @@ You need the following dependencies in order to compile XreaL with all features:
 On Debian or Ubuntu:
 
 	> apt-get install libxxf86dga-dev libxxf86vm-dev libglu1-mesa-dev
+	
+On Fedora
+
+	> yum install libXxf86dga-devel libXxf86vm-devel mesa-libGLU-devel
 
 Compile XreaL:
 	

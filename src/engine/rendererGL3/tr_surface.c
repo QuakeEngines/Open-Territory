@@ -599,6 +599,7 @@ void Tess_InstantQuad(vec4_t quadVerts[4])
 {
 	GLimp_LogComment("--- Tess_InstantQuad ---\n");
 
+	tess.multiDrawPrimitives = 0;
 	tess.numVertexes = 0;
 	tess.numIndexes = 0;
 
@@ -657,6 +658,7 @@ void Tess_InstantQuad(vec4_t quadVerts[4])
 
 	Tess_DrawElements();
 
+	tess.multiDrawPrimitives = 0;
 	tess.numVertexes = 0;
 	tess.numIndexes = 0;
 
@@ -936,10 +938,10 @@ void Tess_SurfacePolybuffer(srfPolyBuffer_t * surf)
 
 	
 	numVertexes = Q_min(surf->pPolyBuffer->numVerts, MAX_PB_VERTS);
-	xyzw = surf->pPolyBuffer->xyz;
-	st = surf->pPolyBuffer->st;
-	color = surf->pPolyBuffer->color;
-	for(i = 0; i < surf->pPolyBuffer->numVerts; i++, xyzw += 4, st += 2, color += 4)
+	xyzw = &surf->pPolyBuffer->xyz[0][0];
+	st = &surf->pPolyBuffer->st[0][0];
+	color = &surf->pPolyBuffer->color[0][0];
+	for(i = 0; i < numVertexes; i++, xyzw += 4, st += 2, color += 4)
 	{
 		VectorCopy(xyzw, tess.xyz[tess.numVertexes + i]);
 		tess.xyz[tess.numVertexes + i][3] = 1;
@@ -1147,17 +1149,20 @@ static void Tess_SurfaceFace(srfSurfaceFace_t * srf)
 	}
 	else
 	{
-		if(r_vboFaces->integer && srf->vbo && srf->ibo && !ShaderRequiresCPUDeforms(tess.surfaceShader))
+		if(r_vboFaces->integer && srf->vbo && srf->ibo && !ShaderRequiresCPUDeforms(tess.surfaceShader) && tess.stageIteratorFunc != Tess_StageIteratorSky)
 		{
-			Tess_EndBegin();
+			if(tess.multiDrawPrimitives >= MAX_MULTIDRAW_PRIMITIVES)
+			{
+				Tess_EndBegin();
+			}
 
 			R_BindVBO(srf->vbo);
 			R_BindIBO(srf->ibo);
 
-			tess.numIndexes += srf->numTriangles * 3;
-			tess.numVertexes += srf->numVerts;
+			tess.multiDrawIndexes[tess.multiDrawPrimitives] = (glIndex_t*) BUFFER_OFFSET(srf->firstTriangle * 3 * sizeof(glIndex_t));
+			tess.multiDrawCounts[tess.multiDrawPrimitives] = srf->numTriangles * 3;
 
-			Tess_End();
+			tess.multiDrawPrimitives++;
 			return;
 		}
 
@@ -1383,15 +1388,18 @@ static void Tess_SurfaceGrid(srfGridMesh_t * srf)
 	{
 		if(r_vboCurves->integer && srf->vbo && srf->ibo && !ShaderRequiresCPUDeforms(tess.surfaceShader))
 		{
-			Tess_EndBegin();
+			if(tess.multiDrawPrimitives >= MAX_MULTIDRAW_PRIMITIVES)
+			{
+				Tess_EndBegin();
+			}
 
 			R_BindVBO(srf->vbo);
 			R_BindIBO(srf->ibo);
 
-			tess.numIndexes += srf->numTriangles * 3;
-			tess.numVertexes += srf->numVerts;
+			tess.multiDrawIndexes[tess.multiDrawPrimitives] = (glIndex_t*) BUFFER_OFFSET(srf->firstTriangle * 3 * sizeof(glIndex_t));
+			tess.multiDrawCounts[tess.multiDrawPrimitives] = srf->numTriangles * 3;
 
-			Tess_End();
+			tess.multiDrawPrimitives++;
 			return;
 		}
 
@@ -1618,15 +1626,18 @@ static void Tess_SurfaceTriangles(srfTriangles_t * srf)
 
 		if(r_vboTriangles->integer && srf->vbo && srf->ibo && !ShaderRequiresCPUDeforms(tess.surfaceShader))
 		{
-			Tess_EndBegin();
+			if(tess.multiDrawPrimitives >= MAX_MULTIDRAW_PRIMITIVES)
+			{
+				Tess_EndBegin();
+			}
 
 			R_BindVBO(srf->vbo);
 			R_BindIBO(srf->ibo);
 
-			tess.numIndexes += srf->numTriangles * 3;
-			tess.numVertexes += srf->numVerts;
+			tess.multiDrawIndexes[tess.multiDrawPrimitives] = (glIndex_t*) BUFFER_OFFSET(srf->firstTriangle * 3 * sizeof(glIndex_t));
+			tess.multiDrawCounts[tess.multiDrawPrimitives] = srf->numTriangles * 3;
 
-			Tess_End();
+			tess.multiDrawPrimitives++;
 			return;
 		}
 
@@ -2340,7 +2351,6 @@ static void Tess_SurfaceMDX(mdvSurface_t * srf)
 	}
 }
 
-#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 
 /*
 ==============
@@ -2383,6 +2393,7 @@ static void Tess_SurfaceMD5(md5Surface_t * srf)
 		{
 			matrix_t        m, m2;
 
+#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 			if(backEnd.currentEntity->e.skeleton.type == SK_ABSOLUTE)
 			{
 				MatrixSetupScale(m,
@@ -2394,6 +2405,7 @@ static void Tess_SurfaceMD5(md5Surface_t * srf)
 				MatrixMultiply(m2, m, boneMatrices[i]);
 			}
 			else
+#endif
 			{
 				MatrixSetupTransformFromQuat(boneMatrices[i], model->bones[i].rotation, model->bones[i].origin);
 			}
@@ -2565,6 +2577,7 @@ static void Tess_SurfaceMD5(md5Surface_t * srf)
 			{
 				matrix_t        m, m2;
 
+#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 				if(backEnd.currentEntity->e.skeleton.type == SK_ABSOLUTE)
 				{
 					MatrixSetupScale(m,
@@ -2576,6 +2589,7 @@ static void Tess_SurfaceMD5(md5Surface_t * srf)
 					MatrixMultiply(m2, m, boneMatrices[i]);
 				}
 				else
+#endif
 				{
 					MatrixSetupTransformFromQuat(boneMatrices[i], model->bones[i].rotation, model->bones[i].origin);
 				}
@@ -2620,6 +2634,7 @@ static void Tess_SurfaceMD5(md5Surface_t * srf)
 			{
 				matrix_t        m, m2;	//, m3;
 
+#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 				if(backEnd.currentEntity->e.skeleton.type == SK_ABSOLUTE)
 				{
 					MatrixSetupScale(m,
@@ -2633,6 +2648,7 @@ static void Tess_SurfaceMD5(md5Surface_t * srf)
 					MatrixMultiply2(boneMatrices[i], model->bones[i].inverseTransform);
 				}
 				else
+#endif
 				{
 					MatrixIdentity(boneMatrices[i]);
 				}
@@ -2703,7 +2719,6 @@ static void Tess_SurfaceMD5(md5Surface_t * srf)
 	}
 }
 
-#endif
 
 /*
 ===========================================================================
@@ -2921,10 +2936,51 @@ static void Tess_SurfaceVBOMesh(srfVBOMesh_t * srf)
 
 /*
 ==============
+Tess_SurfaceVBOMDVMesh
+==============
+*/
+void Tess_SurfaceVBOMDVMesh(srfVBOMDVMesh_t * surface)
+{
+	int             i;
+	mdvModel_t     *mdvModel;
+	mdvSurface_t   *mdvSurface;
+	matrix_t        m, m2;	//, m3
+	refEntity_t    *refEnt;
+	int				curFrame;
+	int				oldFrame;
+
+	GLimp_LogComment("--- Tess_SurfaceVBOMDVMesh ---\n");
+
+	if(!surface->vbo || !surface->ibo)
+		return;
+
+	Tess_EndBegin();
+
+	R_BindVBO(surface->vbo);
+	R_BindIBO(surface->ibo);
+
+	tess.numIndexes += surface->numIndexes;
+	tess.numVertexes += surface->numVerts;
+
+	mdvModel = surface->mdvModel;
+	mdvSurface = surface->mdvSurface;
+
+	refEnt = &backEnd.currentEntity->e;
+
+	curFrame = refEnt->frame;
+
+	glState.vertexAttribsFrame = curFrame;
+
+	
+
+	Tess_End();
+}
+
+/*
+==============
 Tess_SurfaceVBOMD5Mesh
 ==============
 */
-#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 static void Tess_SurfaceVBOMD5Mesh(srfVBOMD5Mesh_t * srf)
 {
 	int             i;
@@ -2946,6 +3002,7 @@ static void Tess_SurfaceVBOMD5Mesh(srfVBOMD5Mesh_t * srf)
 
 	model = srf->md5Model;
 
+#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 	if(backEnd.currentEntity->e.skeleton.type == SK_ABSOLUTE)
 	{
 		tess.vboVertexSkinning = qtrue;
@@ -2982,13 +3039,13 @@ static void Tess_SurfaceVBOMD5Mesh(srfVBOMD5Mesh_t * srf)
 #endif
 	}
 	else
+#endif
 	{
 		tess.vboVertexSkinning = qfalse;
 	}
 
 	Tess_End();
 }
-#endif
 
 /*
 ==============
@@ -3031,16 +3088,13 @@ void            (*rb_surfaceTable[SF_NUM_SURFACE_TYPES]) (void *) =
 		(void (*)(void *))Tess_SurfaceMDX,	// SF_MDX,
 
 		(void (*)(void *))Tess_MDM_SurfaceAnim,	// SF_MDM,
-
-#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 		(void (*)(void *))Tess_SurfaceMD5,	// SF_MD5,
-#endif
+
 		(void (*)(void *))Tess_SurfaceFlare,	// SF_FLARE,
 		(void (*)(void *))Tess_SurfaceEntity,	// SF_ENTITY
 		(void (*)(void *))Tess_SurfaceVBOMesh,	// SF_VBO_MESH
-
-#if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 		(void (*)(void *))Tess_SurfaceVBOMD5Mesh,	// SF_VBO_MD5MESH
-#endif
+		(void (*)(void *))Tess_SurfaceVBOMDMMesh,	// SF_VBO_MD5MESH
+		(void (*)(void *))Tess_SurfaceVBOMDVMesh,	// SF_VBO_MDVMESH
 		(void (*)(void *))Tess_SurfaceVBOShadowVolume	// SF_VBO_SHADOW_VOLUME
 };
