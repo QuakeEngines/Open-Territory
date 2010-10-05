@@ -4,3 +4,6 @@
 [submodule "etmain"]
 	path = etmain
 	url = git://git.code.sf.net/p/openterritory/etmain.git
+[submodule "src/libs/glfw"]
+	path = src/libs/glfw
+	url = git://github.com/raedwulf/glfw.git
