@@ -140,7 +140,7 @@ renderer_list = [
 'src/engine/renderer/tr_model.c',
 'src/engine/renderer/tr_noise.c',
 'src/engine/renderer/tr_scene.c',
-'src/engine/renderer/tr_shade.c',
+'src/engine/renderer/tr_shade.cpp',
 'src/engine/renderer/tr_shade_calc.c',
 'src/engine/renderer/tr_shader.c',
 'src/engine/renderer/tr_shadows.c',
@@ -151,6 +151,7 @@ renderer_list = [
 ]
 
 rendererGL3_list = [
+'src/engine/rendererGL3/gl_shader.cpp',
 'src/engine/rendererGL3/tr_animation_mdm.c',
 'src/engine/rendererGL3/tr_animation.c',
 'src/engine/rendererGL3/tr_backend.c',
@@ -181,7 +182,7 @@ rendererGL3_list = [
 'src/engine/rendererGL3/tr_model_skel.c',
 'src/engine/rendererGL3/tr_noise.c',
 'src/engine/rendererGL3/tr_scene.c',
-'src/engine/rendererGL3/tr_shade.c',
+'src/engine/rendererGL3/tr_shade.cpp',
 'src/engine/rendererGL3/tr_shade_calc.c',
 'src/engine/rendererGL3/tr_shader.c',
 'src/engine/rendererGL3/tr_shadows.c',
@@ -242,6 +243,7 @@ splines_list = [
 ]
 
 client_list = [
+'src/engine/client/cl_avi.c',
 'src/engine/client/cl_cgame.c',
 'src/engine/client/cl_cin.c',
 'src/engine/client/cl_console.c',
@@ -261,22 +263,22 @@ client_list = [
 
 
 linux_sources = [
-        'src/engine/unix/linux_signals.c',
-        'src/engine/unix/unix_main.c',
-        'src/engine/unix/unix_net.c',
-        'src/engine/unix/unix_shared.c',
-        'src/shared/q_shared.c',
-        'src/shared/q_math.c',
+'src/engine/unix/linux_signals.c',
+'src/engine/unix/unix_main.c',
+'src/engine/unix/unix_net.c',
+'src/engine/unix/unix_shared.c',
+'src/shared/q_shared.c',
+'src/shared/q_math.c',
 #        'unix/matha.S'
 ]
 
 linux_full_sources = [
-	'src/libs/glew/src/glew.c',
-        'src/engine/unix/linux_gl3imp.c',
-        #'src/engine/unix/linux_qgl.c',
-        'src/engine/unix/linux_snd.c',
-        'src/engine/unix/linux_joystick.c',
-#        'unix/snd_mixa.S'
+'src/libs/glew/src/glew.c',
+'src/engine/unix/linux_gl3imp.c',
+#'src/engine/unix/linux_qgl.c',
+'src/engine/unix/sdl_snd.c',
+'src/engine/unix/linux_joystick.c',
+#'unix/snd_mixa.S'
 ]
 
 mac_sources = [
@@ -400,6 +402,7 @@ if g_os == 'Linux':
 		local_env.ParseConfig('pkg-config --cflags --libs xext')
 		local_env.ParseConfig('pkg-config --cflags --libs xxf86dga')
 		local_env.ParseConfig('pkg-config --cflags --libs xxf86vm')
+		local_env.ParseConfig('pkg-config --cflags --libs sdl')
 		
 		if env['curl'] == 'system':
 			local_env.ParseConfig('pkg-config --cflags --libs libcurl')

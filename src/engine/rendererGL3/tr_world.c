@@ -118,79 +118,103 @@ added to the sorting list.
 This will also allow mirrors on both sides of a model without recursion.
 ================
 */
-static qboolean R_CullSurface(surfaceType_t * surface, shader_t * shader)
+static qboolean R_CullSurface(surfaceType_t * surface, shader_t * shader, int *frontFace)
 {
-#if 1
-	srfSurfaceFace_t *sface;
+	srfGeneric_t   *gen;
+	int             cull;
 	float           d;
 
+
+	// force to non-front facing
+	*frontFace = 0;
+
+	// allow culling to be disabled
 	if(r_nocull->integer)
 	{
 		return qfalse;
 	}
 
-	if(*surface == SF_GRID)
+	// ydnar: made surface culling generic, inline with q3map2 surface classification
+	switch (*surface)
 	{
-		return R_CullGrid((srfGridMesh_t *) surface);
+		case SF_FACE:
+		case SF_TRIANGLES:
+			break;
+		case SF_GRID:
+			if(r_nocurves->integer)
+			{
+				return qtrue;
+			}
+			break;
+			/*
+		case SF_FOLIAGE:
+			if(!r_drawfoliage->value)
+			{
+				return qtrue;
+			}
+			break;
+			*/
+
+		default:
+			return qtrue;
 	}
 
-	if(*surface == SF_TRIANGLES)
-	{
-		return R_CullTriSurf((srfTriangles_t *) surface);
-	}
+	// get generic surface
+	gen = (srfGeneric_t *) surface;
 
-	if(*surface != SF_FACE)
+	// plane cull
+	if(gen->plane.type != PLANE_NON_PLANAR && r_facePlaneCull->integer)
 	{
-		return qfalse;
-	}
-
-	// now it must be a SF_FACE
-	sface = (srfSurfaceFace_t *) surface;
-
-	if(shader->isPortal)
-	{
-		if(R_CullLocalBox(sface->bounds) == CULL_OUT)
+		d = DotProduct(tr.orientation.viewOrigin, gen->plane.normal) - gen->plane.dist;
+		if(d > 0.0f)
 		{
+			*frontFace = 1;
+		}
+
+		// don't cull exactly on the plane, because there are levels of rounding
+		// through the BSP, ICD, and hardware that may cause pixel gaps if an
+		// epsilon isn't allowed here
+		if(shader->cullType == CT_FRONT_SIDED)
+		{
+			if(d < -8.0f)
+			{
+				tr.pc.c_plane_cull_out++;
+				return qtrue;
+			}
+		}
+		else if(shader->cullType == CT_BACK_SIDED)
+		{
+			if(d > 8.0f)
+			{
+				tr.pc.c_plane_cull_out++;
+				return qtrue;
+			}
+		}
+
+		tr.pc.c_plane_cull_in++;
+	}
+
+	{
+		// try sphere cull
+		if(tr.currentEntity != &tr.worldEntity)
+		{
+			cull = R_CullLocalPointAndRadius(gen->origin, gen->radius);
+		}
+		else
+		{
+			cull = R_CullPointAndRadius(gen->origin, gen->radius);
+		}
+		if(cull == CULL_OUT)
+		{
+			tr.pc.c_sphere_cull_out++;
 			return qtrue;
 		}
+
+		tr.pc.c_sphere_cull_in++;
 	}
 
-	if(shader->cullType == CT_TWO_SIDED)
-	{
-		return qfalse;
-	}
-
-	// face culling
-	if(!r_facePlaneCull->integer)
-	{
-		return qfalse;
-	}
-
-
-	d = DotProduct(tr.orientation.viewOrigin, sface->plane.normal);
-
-	// don't cull exactly on the plane, because there are levels of rounding
-	// through the BSP, ICD, and hardware that may cause pixel gaps if an
-	// epsilon isn't allowed here
-	if(shader->cullType == CT_FRONT_SIDED)
-	{
-		if(d < sface->plane.dist - 8)
-		{
-			return qtrue;
-		}
-	}
-	else
-	{
-		if(d > sface->plane.dist + 8)
-		{
-			return qtrue;
-		}
-	}
-
+	// must be visible
 	return qfalse;
-#else
-	return qfalse;
-#endif
 }
 
 static qboolean R_LightSurfaceGeneric(srfGeneric_t * face, trRefLight_t  * light, byte * cubeSideBits)
@@ -287,7 +311,7 @@ R_AddWorldSurface
 */
 static void R_AddWorldSurface(bspSurface_t * surf, int decalBits)
 {
-	int				i;
+	int				i, frontFace;
 	shader_t       *shader;
 
 	if(surf->viewCount == tr.viewCountNoReset)
@@ -318,7 +342,7 @@ static void R_AddWorldSurface(bspSurface_t * surf, int decalBits)
 		return;
 
 	// try to cull before lighting or adding
-	if(R_CullSurface(surf->data, surf->shader))
+	if(R_CullSurface(surf->data, surf->shader, &frontFace))
 	{
 		return;
 	}
@@ -341,6 +365,8 @@ R_AddBrushModelSurface
 */
 static void R_AddBrushModelSurface(bspSurface_t * surf)
 {
+	int			frontFace;
+
 	if(surf->viewCount == tr.viewCountNoReset)
 	{
 		return;					// already in this view
@@ -348,12 +374,12 @@ static void R_AddBrushModelSurface(bspSurface_t * surf)
 	surf->viewCount = tr.viewCountNoReset;
 
 	// try to cull before lighting or adding
-	if(R_CullSurface(surf->data, surf->shader))
+	if(R_CullSurface(surf->data, surf->shader, &frontFace))
 	{
 		return;
 	}
 
-	R_AddDrawSurf(surf->data, surf->shader, -1);//surf->lightmapNum);
+	R_AddDrawSurf(surf->data, surf->shader, surf->lightmapNum);
 }
 
 /*
@@ -369,6 +395,7 @@ void R_AddBSPModelSurfaces(trRefEntity_t * ent)
 	vec3_t          v;
 	vec3_t          transformed;
 	vec3_t			boundsCenter;
+	float			boundsRadius;
 
 	pModel = R_GetModelByHandle(ent->e.hModel);
 	bspModel = pModel->bsp;
@@ -380,11 +407,16 @@ void R_AddBSPModelSurfaces(trRefEntity_t * ent)
 		ent->localBounds[1][i] = bspModel->bounds[1][i];
 	}
 
+#if 0
+	boundsRadius = RadiusFromBounds(bspModel->bounds[0], bspModel->bounds[1]);
+	ent->cull = R_CullPointAndRadius(ent->e.origin, boundsRadius);
+#else
 	ent->cull = R_CullLocalBox(bspModel->bounds);
 	if(ent->cull == CULL_OUT)
 	{
 		return;
 	}
+#endif
 
 	// setup world bounds for intersection tests
 	ClearBounds(ent->worldBounds[0], ent->worldBounds[1]);
@@ -439,6 +471,54 @@ void R_AddBSPModelSurfaces(trRefEntity_t * ent)
 
 
 
+
+static void R_AddLeafSurfaces(bspNode_t * node, int decalBits)
+{
+	int             c;
+	bspSurface_t   *surf, **mark;
+
+	tr.pc.c_leafs++;
+
+	// add to z buffer bounds
+	if(node->mins[0] < tr.viewParms.visBounds[0][0])
+	{
+		tr.viewParms.visBounds[0][0] = node->mins[0];
+	}
+	if(node->mins[1] < tr.viewParms.visBounds[0][1])
+	{
+		tr.viewParms.visBounds[0][1] = node->mins[1];
+	}
+	if(node->mins[2] < tr.viewParms.visBounds[0][2])
+	{
+		tr.viewParms.visBounds[0][2] = node->mins[2];
+	}
+
+	if(node->maxs[0] > tr.viewParms.visBounds[1][0])
+	{
+		tr.viewParms.visBounds[1][0] = node->maxs[0];
+	}
+	if(node->maxs[1] > tr.viewParms.visBounds[1][1])
+	{
+		tr.viewParms.visBounds[1][1] = node->maxs[1];
+	}
+	if(node->maxs[2] > tr.viewParms.visBounds[1][2])
+	{
+		tr.viewParms.visBounds[1][2] = node->maxs[2];
+	}
+
+
+	// add the individual surfaces
+	mark = node->markSurfaces;
+	c = node->numMarkSurfaces;
+	while(c--)
+	{
+		// the surface may have already been added if it
+		// spans multiple leafs
+		surf = *mark;
+		R_AddWorldSurface(surf, decalBits);
+		mark++;
+	}
+}
 
 /*
 ================
@@ -518,53 +598,13 @@ static void R_RecursiveWorldNode(bspNode_t * node, int planeBits, int decalBits)
 		node = node->children[1];
 	} while(1);
 
+	if(node->numMarkSurfaces)
 	{
-		// leaf node, so add mark surfaces
-		int             c;
-		bspSurface_t   *surf, **mark;
-
-		tr.pc.c_leafs++;
-
-		// add to z buffer bounds
-		if(node->mins[0] < tr.viewParms.visBounds[0][0])
-		{
-			tr.viewParms.visBounds[0][0] = node->mins[0];
-		}
-		if(node->mins[1] < tr.viewParms.visBounds[0][1])
-		{
-			tr.viewParms.visBounds[0][1] = node->mins[1];
-		}
-		if(node->mins[2] < tr.viewParms.visBounds[0][2])
-		{
-			tr.viewParms.visBounds[0][2] = node->mins[2];
-		}
-
-		if(node->maxs[0] > tr.viewParms.visBounds[1][0])
-		{
-			tr.viewParms.visBounds[1][0] = node->maxs[0];
-		}
-		if(node->maxs[1] > tr.viewParms.visBounds[1][1])
-		{
-			tr.viewParms.visBounds[1][1] = node->maxs[1];
-		}
-		if(node->maxs[2] > tr.viewParms.visBounds[1][2])
-		{
-			tr.viewParms.visBounds[1][2] = node->maxs[2];
-		}
-
-
-		// add the individual surfaces
-		mark = node->markSurfaces;
-		c = node->numMarkSurfaces;
-		while(c--)
-		{
-			// the surface may have already been added if it
-			// spans multiple leafs
-			surf = *mark;
-			R_AddWorldSurface(surf, decalBits);
-			mark++;
-		}
+		// ydnar: moved off to separate function
+		R_AddLeafSurfaces(node, decalBits);
 	}
+
+	
 }
 
 /*
@@ -1123,20 +1163,19 @@ static void R_MarkLeaves(void)
 	{
 		if(tr.visClusters[i] == cluster)
 		{
-			//tr.visIndex = i;
-			break;
+			// if r_showcluster was just turned on, remark everything
+			if(!tr.refdef.areamaskModified && !r_showcluster->modified)// && !r_dynamicBspOcclusionCulling->modified)
+			{
+				if(tr.visClusters[i] != tr.visClusters[tr.visIndex] && r_showcluster->integer)
+				{
+					ri.Printf(PRINT_ALL, "found cluster:%i  area:%i  index:%i\n", cluster, leaf->area, i);
+				}
+				tr.visIndex = i;
+				return;
+			}
 		}
 	}
-	// if r_showcluster was just turned on, remark everything
-	if(i != MAX_VISCOUNTS && !tr.refdef.areamaskModified && !r_showcluster->modified)// && !r_dynamicBspOcclusionCulling->modified)
-	{
-		if(tr.visClusters[i] != tr.visClusters[tr.visIndex] && r_showcluster->integer)
-		{
-			ri.Printf(PRINT_ALL, "found cluster:%i  area:%i  index:%i\n", cluster, leaf->area, i);
-		}
-		tr.visIndex = i;
-		return;
-	}
+	
 
 	tr.visIndex = (tr.visIndex + 1) % MAX_VISCOUNTS;
 	tr.visCounts[tr.visIndex]++;
@@ -1144,10 +1183,10 @@ static void R_MarkLeaves(void)
 
 	if(r_showcluster->modified || r_showcluster->integer)
 	{
-		//r_showcluster->modified = qfalse;
+		r_showcluster->modified = qfalse;
 		if(r_showcluster->integer)
 		{
-			ri.Printf(PRINT_ALL, "update cluster:%i  area:%i  index:%i", cluster, leaf->area, tr.visIndex);
+			ri.Printf(PRINT_ALL, "update cluster:%i  area:%i  index:%i\n", cluster, leaf->area, tr.visIndex);
 		}
 	}
 
@@ -1158,7 +1197,7 @@ static void R_MarkLeaves(void)
 	}
 	*/
 
-	if(!r_dynamicBspOcclusionCulling->integer)
+	if(r_mergeClusterSurfaces->integer && !r_dynamicBspOcclusionCulling->integer)
 	{
 		R_UpdateClusterSurfaces();
 	}
@@ -1197,6 +1236,19 @@ static void R_MarkLeaves(void)
 		if((tr.refdef.areamask[leaf->area >> 3] & (1 << (leaf->area & 7))))
 		{
 			continue;			// not visible
+		}
+
+		// ydnar: don't want to walk the entire bsp to add skybox surfaces
+		if(tr.refdef.rdflags & RDF_SKYBOXPORTAL)
+		{
+			// this only happens once, as game/cgame know the origin of the skybox
+			// this also means the skybox portal cannot move, as this list is calculated once and never again
+			if(tr.world->numSkyNodes < WORLD_MAX_SKY_NODES)
+			{
+				tr.world->skyNodes[tr.world->numSkyNodes++] = leaf;
+			}
+			R_AddLeafSurfaces(leaf, 0);
+			continue;
 		}
 
 		parent = leaf;
@@ -1289,7 +1341,7 @@ static qboolean InsideViewFrustum(bspNode_t * node, int planeBits)
 
 
 
-static void DrawNode_r(bspNode_t * node, int planeBits, int decalBits)
+static void DrawNode_r(bspNode_t * node, int planeBits)
 {
 	do
 	{
@@ -1319,9 +1371,6 @@ static void DrawNode_r(bspNode_t * node, int planeBits, int decalBits)
 
 		if(node->contents != -1 && !(node->contents & CONTENTS_TRANSLUCENT))
 		{
-#if defined(USE_D3D10)
-			//TODO
-#else
 			R_BindVBO(node->volumeVBO);
 			R_BindIBO(node->volumeIBO);
 
@@ -1335,31 +1384,11 @@ static void DrawNode_r(bspNode_t * node, int planeBits, int decalBits)
 			tess.multiDrawPrimitives = 0;
 			tess.numIndexes = 0;
 			tess.numVertexes = 0;
-#endif
 			break;
 		}
 
-		// ydnar: cull decals
-		if(decalBits)
-		{
-			int             i;
-
-			for(i = 0; i < tr.refdef.numDecalProjectors; i++)
-			{
-				if(decalBits & (1 << i))
-				{
-					// test decal bounds against node surface bounds
-					if(tr.refdef.decalProjectors[i].shader == NULL ||
-					   !R_TestDecalBoundingBox(&tr.refdef.decalProjectors[i], node->surfMins, node->surfMaxs))
-					{
-						decalBits &= ~(1 << i);
-					}
-				}
-			}
-		}
-
 		// recurse down the children, front side first
-		DrawNode_r(node->children[0], planeBits, decalBits);
+		DrawNode_r(node->children[0], planeBits);
 
 		// tail recurse
 		node = node->children[1];
@@ -1765,7 +1794,7 @@ static void R_CoherentHierachicalCulling()
 		R_BindNullFBO();
 	}
 
-	GL_BindProgram(&tr.genericSingleShader);
+	GL_BindProgram(&tr.genericShader);
 	GL_Cull(CT_TWO_SIDED);
 
 	GL_LoadProjectionMatrix(tr.viewParms.projectionMatrix);
@@ -1777,24 +1806,24 @@ static void R_CoherentHierachicalCulling()
 			   tr.viewParms.viewportWidth, tr.viewParms.viewportHeight);
 
 	// set uniforms
-	GLSL_SetUniform_TCGen_Environment(&tr.genericSingleShader,  qfalse);
-	GLSL_SetUniform_ColorGen(&tr.genericSingleShader, CGEN_VERTEX);
-	GLSL_SetUniform_AlphaGen(&tr.genericSingleShader, AGEN_VERTEX);
+	GLSL_SetUniform_TCGen_Environment(&tr.genericShader,  qfalse);
+	GLSL_SetUniform_ColorGen(&tr.genericShader, CGEN_VERTEX);
+	GLSL_SetUniform_AlphaGen(&tr.genericShader, AGEN_VERTEX);
 	if(glConfig2.vboVertexSkinningAvailable)
 	{
-		GLSL_SetUniform_VertexSkinning(&tr.genericSingleShader, qfalse);
+		GLSL_SetUniform_VertexSkinning(&tr.genericShader, qfalse);
 	}
-	GLSL_SetUniform_DeformGen(&tr.genericSingleShader, DGEN_NONE);
-	GLSL_SetUniform_AlphaTest(&tr.genericSingleShader, 0);
+	GLSL_SetUniform_DeformGen(&tr.genericShader, DGEN_NONE);
+	GLSL_SetUniform_AlphaTest(&tr.genericShader, 0);
 
 	// set up the transformation matrix
 	GL_LoadModelViewMatrix(tr.orientation.modelViewMatrix);
-	GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericSingleShader, glState.modelViewProjectionMatrix[glState.stackIndex]);
+	GLSL_SetUniform_ModelViewProjectionMatrix(&tr.genericShader, glState.modelViewProjectionMatrix[glState.stackIndex]);
 
 	// bind u_ColorMap
 	GL_SelectTexture(0);
 	GL_Bind(tr.whiteImage);
-	GLSL_SetUniform_ColorTextureMatrix(&tr.genericSingleShader, matrixIdentity);
+	GLSL_SetUniform_ColorTextureMatrix(&tr.genericShader, matrixIdentity);
 
 #if 0
 	GL_ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -2363,57 +2392,70 @@ void R_AddWorldSurfaces(void)
 
 	tr.currentEntity = &tr.worldEntity;
 
-	// determine which leaves are in the PVS / areamask
-	R_MarkLeaves();
-
 	// clear out the visible min/max
 	ClearBounds(tr.viewParms.visBounds[0], tr.viewParms.visBounds[1]);
 
-	// update the bsp nodes with the dynamic occlusion query results
-	if(glConfig2.occlusionQueryBits && glConfig.driverType != GLDRV_MESA && r_dynamicBspOcclusionCulling->integer)
+	// render sky or world?
+	if(tr.refdef.rdflags & RDF_SKYBOXPORTAL && tr.world->numSkyNodes > 0)
 	{
-		R_CoherentHierachicalCulling();
+		int             i;
+		bspNode_t     **node;
+
+		for(i = 0, node = tr.world->skyNodes; i < tr.world->numSkyNodes; i++, node++)
+			R_AddLeafSurfaces(*node, 0);	// no decals on skybox nodes
 	}
 	else
 	{
-		ClearLink(&tr.traversalStack);
-		ClearLink(&tr.occlusionQueryQueue);
-		ClearLink(&tr.occlusionQueryList);
 
-		// update visbounds and add surfaces that weren't cached with VBOs
-		R_RecursiveWorldNode(tr.world->nodes, FRUSTUM_CLIPALL, tr.refdef.decalBits);
-	}
+		// determine which leaves are in the PVS / areamask
+		R_MarkLeaves();
 
-	// ydnar: add decal surfaces
-	R_AddDecalSurfaces(tr.world->models);
-
-	if(r_mergeClusterSurfaces->integer && !r_dynamicBspOcclusionCulling->integer)
-	{
-		int             j, i;
-		srfVBOMesh_t   *srf;
-		shader_t       *shader;
-		cplane_t       *frust;
-		int             r;
-
-		for(j = 0; j < tr.world->numClusterVBOSurfaces[tr.visIndex]; j++)
+		// update the bsp nodes with the dynamic occlusion query results
+		if(glConfig2.occlusionQueryBits && glConfig.driverType != GLDRV_MESA && r_dynamicBspOcclusionCulling->integer)
 		{
-			srf = (srfVBOMesh_t *) Com_GrowListElement(&tr.world->clusterVBOSurfaces[tr.visIndex], j);
-			shader = srf->shader;
+			R_CoherentHierachicalCulling();
+		}
+		else
+		{
+			ClearLink(&tr.traversalStack);
+			ClearLink(&tr.occlusionQueryQueue);
+			ClearLink(&tr.occlusionQueryList);
 
-			for(i = 0; i < FRUSTUM_PLANES; i++)
+			// update visbounds and add surfaces that weren't cached with VBOs
+			R_RecursiveWorldNode(tr.world->nodes, FRUSTUM_CLIPALL, tr.refdef.decalBits);
+		}
+
+		// ydnar: add decal surfaces
+		R_AddDecalSurfaces(tr.world->models);
+
+		if(r_mergeClusterSurfaces->integer && !r_dynamicBspOcclusionCulling->integer)
+		{
+			int             j, i;
+			srfVBOMesh_t   *srf;
+			shader_t       *shader;
+			cplane_t       *frust;
+			int             r;
+
+			for(j = 0; j < tr.world->numClusterVBOSurfaces[tr.visIndex]; j++)
 			{
-				frust = &tr.viewParms.frustums[0][i];
+				srf = (srfVBOMesh_t *) Com_GrowListElement(&tr.world->clusterVBOSurfaces[tr.visIndex], j);
+				shader = srf->shader;
 
-				r = BoxOnPlaneSide(srf->bounds[0], srf->bounds[1], frust);
-
-				if(r == 2)
+				for(i = 0; i < FRUSTUM_PLANES; i++)
 				{
-					// completely outside frustum
-					continue;
-				}
-			}
+					frust = &tr.viewParms.frustums[0][i];
 
-			R_AddDrawSurf((void *)srf, shader, srf->lightmapNum);
+					r = BoxOnPlaneSide(srf->bounds[0], srf->bounds[1], frust);
+
+					if(r == 2)
+					{
+						// completely outside frustum
+						continue;
+					}
+				}
+
+				R_AddDrawSurf((void *)srf, shader, srf->lightmapNum);
+			}
 		}
 	}
 }

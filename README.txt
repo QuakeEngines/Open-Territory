@@ -35,6 +35,8 @@ This file contains the following sections:
 	5) COMPILING ON WIN32 WITH VISUAL C++ 2008 EXPRESS EDITION
 
 	6) COMPILING ON GNU/LINUX
+	
+	7) CHANGES
 
 
 
@@ -49,7 +51,7 @@ Minimum system requirements:
 
 	CPU: 2 GHz Intel compatible
 	System Memory: 512MB
-	Graphics card: GeForce 6600 GT or any other Shader Model 3.0 compatible GFX card 
+	Graphics card: Any graphics card that supports Direct3D 10 and OpenGL >= 3.2
 
 Recommended system requirements:
 
@@ -83,13 +85,10 @@ covered by the original EULA and must be obeyed as usual.
 Wolfenstein: Enemy Territory is a free release, and can be downloaded from
 http://www.splashdamage.com/content/wolfenstein-enemy-territory-barracks
 
-Install the latest version of the game for your platform to get the game data.
+Install the latest version of the game for your platform to get the game data and copy it to ET-XreaL/etmain or
+patch your Wolfenstein: Enemy Territory by extracting ET-XreaL over it.
 
 
-For Techies Only: 
-If you want to test the engine with an OpenGL >= 3.2 core profile enabled then start it with: 
-	
-	> +set r_glCoreProfile 1
 
 ____________________________________________
 
@@ -128,11 +127,11 @@ You need the following dependencies in order to compile XreaL with all features:
  
 On Debian or Ubuntu:
 
-	> apt-get install libxxf86dga-dev libxxf86vm-dev libglu1-mesa-dev
+	> apt-get install libsdl1.2-dev libxxf86dga-dev libxxf86vm-dev libglu1-mesa-dev
 	
 On Fedora
 
-	> yum install libXxf86dga-devel libXxf86vm-devel mesa-libGLU-devel
+	> yum install SDL-devel libXxf86dga-devel libXxf86vm-devel mesa-libGLU-devel
 
 Compile XreaL:
 	
@@ -141,6 +140,18 @@ Compile XreaL:
 Type scons -h for more compile options.
 
 
+___________________________________________________
 
+7) Changes made since the Wolfenstein: Enemy Territory GPL release
+__________________________________________
+
+	* ported XreaL renderer to src/engine/rendererGL3/
+	* rewrote .mdm/.mdx code to be GPU accelerated
+	* rewrote .md3/.mdc code to be GPU accelerated
+	* added support for Linux 64-bit
+	* replaced Linux sound backend with SDL
+	* added .avi recorder from ioquake3 including sound support
+	* added new ETXMap bsp compiler based on NetRadiant's q3map2
+	* added new ETXRadiant level editor based on DarkRadiant
 
 

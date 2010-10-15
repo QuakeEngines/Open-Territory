@@ -1155,17 +1155,25 @@ enum
 #else
 enum
 {
-	ATTR_INDEX_POSITION = 0,
-	ATTR_INDEX_TEXCOORD0 = 1,
-	ATTR_INDEX_TEXCOORD1 = 2,
-	ATTR_INDEX_TANGENT = 3,
-	ATTR_INDEX_BINORMAL = 4,
-	ATTR_INDEX_NORMAL = 5,
-	ATTR_INDEX_COLOR = 6,
-	ATTR_INDEX_PAINTCOLOR = 7,
-	ATTR_INDEX_LIGHTDIRECTION = 8,
-	ATTR_INDEX_BONE_INDEXES = 9,
-	ATTR_INDEX_BONE_WEIGHTS = 10,
+	ATTR_INDEX_POSITION,
+	ATTR_INDEX_TEXCOORD0,
+	ATTR_INDEX_TEXCOORD1,
+	ATTR_INDEX_TANGENT,
+	ATTR_INDEX_BINORMAL,
+	ATTR_INDEX_NORMAL,
+	ATTR_INDEX_COLOR,
+	ATTR_INDEX_PAINTCOLOR,
+	ATTR_INDEX_LIGHTDIRECTION,
+
+	// GPU vertex skinning
+	ATTR_INDEX_BONE_INDEXES,
+	ATTR_INDEX_BONE_WEIGHTS,
+
+	// GPU vertex animations
+	ATTR_INDEX_POSITION2,
+	ATTR_INDEX_TANGENT2,
+	ATTR_INDEX_BINORMAL2,
+	ATTR_INDEX_NORMAL2,
 };
 #endif
 
@@ -1259,11 +1267,18 @@ enum
 	ATTR_COLOR = BIT(6),
 	ATTR_PAINTCOLOR = BIT(7),
 	ATTR_LIGHTDIRECTION = BIT(8),
+	
 	ATTR_BONE_INDEXES = BIT(9),
 	ATTR_BONE_WEIGHTS = BIT(10),
 
+	// for .md3 interpolation
+	ATTR_POSITION2 = BIT(11),
+	ATTR_TANGENT2 = BIT(12),
+	ATTR_BINORMAL2 = BIT(13),
+	ATTR_NORMAL2 = BIT(14),
+
 	// FIXME XBSP format with ATTR_LIGHTDIRECTION and ATTR_PAINTCOLOR
-	ATTR_DEFAULT = ATTR_POSITION | ATTR_TEXCOORD | ATTR_TANGENT | ATTR_BINORMAL | ATTR_COLOR,
+	//ATTR_DEFAULT = ATTR_POSITION | ATTR_TEXCOORD | ATTR_TANGENT | ATTR_BINORMAL | ATTR_COLOR,
 
 	ATTR_BITS =	ATTR_POSITION |
 				ATTR_TEXCOORD |
@@ -1284,6 +1299,7 @@ enum
 typedef struct shaderProgram_s
 {
 	char            name[MAX_QPATH];
+	char           *compileMacros;
 
 	GLhandleARB     program;
 	uint32_t        attribs;	// vertex array attributes
@@ -1470,11 +1486,32 @@ typedef struct shaderProgram_s
 	GLint           u_VertexSkinning;
 	qboolean		t_VertexSkinning;
 
+	GLint			u_VertexInterpolation;
+	float			t_VertexInterpolation;
+
 	GLint           u_BoneMatrix;
 
 	GLint           u_Time;
 	float			t_Time;
 } shaderProgram_t;
+
+/*
+enum
+{
+	GLSLMACRO_vertexLighting_DBS_entity_USE_PORTAL_CLIPPING = BIT(0),
+	GLSLMACRO_vertexLighting_DBS_entity_USE_ALPHA_TESTING = BIT(1),
+	GLSLMACRO_vertexLighting_DBS_entity_USE_VERTEX_SKINNING = BIT(2),
+	GLSLMACRO_vertexLighting_DBS_entity_USE_VERTEX_ANIMATION = BIT(3),
+
+	GLSLMACRO_vertexLighting_DBS_entity_ALL_COMPILE_FLAGS =
+						GLSLMACRO_vertexLighting_DBS_entity_USE_PORTAL_CLIPPING |
+						GLSLMACRO_vertexLighting_DBS_entity_USE_ALPHA_TESTING |
+						GLSLMACRO_vertexLighting_DBS_entity_USE_VERTEX_SKINNING |
+						GLSLMACRO_vertexLighting_DBS_entity_USE_VERTEX_ANIMATION,
+
+	GLSLMACRO_vertexLighting_DBS_entity_MAX_PERMUTATIONS = GLSLMACRO_vertexLighting_DBS_entity_USE_VERTEX_ANIMATION
+};
+*/	
 
 //
 // Tr3B: these are fire wall functions to avoid expensive redundant glUniform* calls
@@ -2379,6 +2416,25 @@ static ID_INLINE void GLSL_SetUniform_VertexSkinning(shaderProgram_t * program, 
 	glUniform1iARB(program->u_VertexSkinning, value);
 }
 
+static ID_INLINE void GLSL_SetUniform_VertexInterpolation(shaderProgram_t * program, float value)
+{
+#if defined(USE_UNIFORM_FIREWALL)
+	if(program->t_VertexInterpolation == value)
+		return;
+
+	program->t_VertexInterpolation = value;
+#endif
+
+#if defined(LOG_GLSL_UNIFORMS)
+	if(r_logFile->integer)
+	{
+		GLimp_LogComment(va("--- GLSL_SetUniform_VertexInterpolation( program = %s, value = %f ) ---\n", program->name, value));
+	}
+#endif
+
+	glUniform1fARB(program->u_VertexInterpolation, value);
+}
+
 static ID_INLINE void GLSL_SetUniform_Time(shaderProgram_t * program, float value)
 {
 #if defined(USE_UNIFORM_FIREWALL)
@@ -3089,6 +3145,9 @@ typedef struct
 	vec3_t			direction;
 } bspGridPoint_t;
 
+// ydnar: optimization
+#define WORLD_MAX_SKY_NODES 32
+
 typedef struct
 {
 	char            name[MAX_QPATH];	// ie: maps/tim_dm2.bsp
@@ -3108,6 +3167,9 @@ typedef struct
 	int             numnodes;	// includes leafs
 	int             numDecisionNodes;
 	bspNode_t      *nodes;
+
+	int             numSkyNodes;
+	bspNode_t     **skyNodes;	// ydnar: don't walk the entire bsp when rendering sky
 
 	int             numVerts;
 	srfVert_t      *verts;
@@ -3524,6 +3586,9 @@ extern int      gl_filter_min, gl_filter_max;
 */
 typedef struct
 {
+	int             c_sphere_cull_in, c_sphere_cull_out;
+	int             c_plane_cull_in, c_plane_cull_out;
+
 	int             c_sphere_cull_patch_in, c_sphere_cull_patch_clip, c_sphere_cull_patch_out;
 	int             c_box_cull_patch_in, c_box_cull_patch_clip, c_box_cull_patch_out;
 	int             c_sphere_cull_mdx_in, c_sphere_cull_mdx_clip, c_sphere_cull_mdx_out;
@@ -3613,7 +3678,9 @@ typedef struct
 	uint32_t        glStateBits;
 	uint32_t		vertexAttribsState;
 	uint32_t		vertexAttribPointersSet;
-	uint32_t		vertexAttribsFrame;		// offset for VBO vertex animations
+	float			vertexAttribsInterpolation;	// 0 = no interpolation, 1 = final position
+	uint32_t		vertexAttribsNewFrame;		// offset for VBO vertex animations
+	uint32_t		vertexAttribsOldFrame;		// offset for VBO vertex animations
 	shaderProgram_t *currentProgram;
 	FBO_t          *currentFBO;
 	VBO_t          *currentVBO;
@@ -3693,6 +3760,12 @@ typedef struct
 	vec3_t          origin;
 	image_t        *cubemap;
 } cubemapProbe_t;
+
+
+#if defined(__cplusplus)
+class GLShader;
+class GLShader_vertexLighting_DBS_entity;
+#endif
 
 
 /*
@@ -3818,10 +3891,10 @@ typedef struct
 	//
 #if !defined(USE_D3D10)
 	// Q3A standard simple vertex color rendering
-	shaderProgram_t genericSingleShader;
+	shaderProgram_t genericShader;
 
 	// simple vertex color shading for entities
-	shaderProgram_t vertexLightingShader_DBS_entity;
+	//shaderProgram_t vertexLightingShader_DBS_entity[GLSLMACRO_vertexLighting_DBS_entity_MAX_PERMUTATIONS];
 
 	// simple vertex color shading for the world
 	shaderProgram_t vertexLightingShader_DBS_world;
@@ -3942,6 +4015,8 @@ typedef struct
 
 	int             numFBOs;
 	FBO_t          *fbos[MAX_FBOS];
+
+	GLuint			vao;
 
 	growList_t      vbos;
 	growList_t      ibos;

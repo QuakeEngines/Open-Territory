@@ -955,22 +955,25 @@ static void GLW_InitExtensions(void)
 	GL_CheckErrors();
 
 	// GL_ARB_multitexture
-	if(GLEW_ARB_multitexture)
+	if(glConfig.driverType != GLDRV_OPENGL3)
 	{
-		glGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, &glConfig.maxActiveTextures);
-
-		if(glConfig.maxActiveTextures > 1)
+		if(GLEW_ARB_multitexture)
 		{
-			ri.Printf(PRINT_ALL, "...using GL_ARB_multitexture\n");
+			glGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, &glConfig.maxActiveTextures);
+
+			if(glConfig.maxActiveTextures > 1)
+			{
+				ri.Printf(PRINT_ALL, "...using GL_ARB_multitexture\n");
+			}
+			else
+			{
+				ri.Error(ERR_VID_FATAL, "...not using GL_ARB_multitexture, < 2 texture units\n");
+			}
 		}
 		else
 		{
-			ri.Error(ERR_VID_FATAL, "...not using GL_ARB_multitexture, < 2 texture units\n");
+			ri.Error(ERR_VID_FATAL, "...GL_ARB_multitexture not found\n");
 		}
-	}
-	else
-	{
-		ri.Error(ERR_VID_FATAL, "...GL_ARB_multitexture not found\n");
 	}
 	
 
@@ -1608,6 +1611,10 @@ static void GLW_InitOpenGL3xContext()
 	{
 		//if(!g_wvPtr->openGL3ContextCreated)
 		{
+			int				attribs[256];	// should be really enough
+			int				numAttribs;
+
+			/*
 			int             attribs[] =
 			{
 				WGL_CONTEXT_MAJOR_VERSION_ARB, r_glMinMajorVersion->integer,
@@ -1617,6 +1624,36 @@ static void GLW_InitOpenGL3xContext()
 				WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 				0
 			};
+			*/
+
+			memset(attribs, 0, sizeof(attribs));
+			numAttribs = 0;
+
+			attribs[numAttribs++] = WGL_CONTEXT_MAJOR_VERSION_ARB;
+			attribs[numAttribs++] = r_glMinMajorVersion->integer;
+
+			attribs[numAttribs++] = WGL_CONTEXT_MINOR_VERSION_ARB;
+			attribs[numAttribs++] = r_glMinMinorVersion->integer;
+
+
+			if(WGLEW_ARB_create_context_profile)
+			{
+				attribs[numAttribs++] = WGL_CONTEXT_FLAGS_ARB;
+
+#if 0
+				if(GLXEW_ARB_debug_output)
+				{
+					attribs[numAttribs++] = WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB |  WGL_CONTEXT_DEBUG_BIT_ARB;
+				}
+				else
+#endif
+				{
+					attribs[numAttribs++] = WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
+				}
+
+				attribs[numAttribs++] = WGL_CONTEXT_PROFILE_MASK_ARB;
+				attribs[numAttribs++] = WGL_CONTEXT_CORE_PROFILE_BIT_ARB;
+			}
 
 			// set current context to NULL
 			retVal = wglMakeCurrent(glw_state.hDC, NULL) != 0;
@@ -1651,7 +1688,10 @@ static void GLW_InitOpenGL3xContext()
 			}
 			else
 			{
-				ri.Error(ERR_VID_FATAL, "GLW_StartOpenGL() - could not initialize OpenGL %i.%i context", r_glMinMajorVersion->integer, r_glMinMinorVersion->integer);
+				ri.Error(ERR_VID_FATAL, "Could not initialize OpenGL %i.%i context\n"
+										"Make sure your graphics card supports OpenGL %i.%i or newer",
+										r_glMinMajorVersion->integer, r_glMinMinorVersion->integer,
+										r_glMinMajorVersion->integer, r_glMinMinorVersion->integer);
 			}
 		}
 		/*
@@ -1678,7 +1718,10 @@ static void GLW_InitOpenGL3xContext()
 	}
 	else
 	{
-		ri.Error(ERR_VID_FATAL, "GLW_StartOpenGL() - could not initialize OpenGL %i.%i context: no WGL_ARB_create_context", r_glMinMajorVersion->integer, r_glMinMinorVersion->integer);
+		ri.Error(ERR_VID_FATAL, "Could not initialize OpenGL %i.%i context: no WGL_ARB_create_context\n"
+								"Make sure your graphics card supports OpenGL %i.%i or newer",
+								r_glMinMajorVersion->integer, r_glMinMinorVersion->integer,
+								r_glMinMajorVersion->integer, r_glMinMinorVersion->integer);
 	}
 }
 
@@ -1907,7 +1950,8 @@ void GLimp_Init(void)
 
 	ri.Cvar_Set("r_lastValidRenderer", glConfig.renderer_string);
 
-	GL_CheckErrors();
+	GLW_InitExtensions();
+	WG_CheckHardwareGamma();
 
 	GLW_InitExtensions();
 }

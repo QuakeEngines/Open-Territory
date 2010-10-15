@@ -992,41 +992,42 @@ RB_TakeVideoFrameCmd
 const void     *RB_TakeVideoFrameCmd(const void *data)
 {
 	const videoFrameCommand_t *cmd;
-//	int             frameSize;
-//	int             i;
+	int             frameSize;
+	int             i;
 
 	cmd = (const videoFrameCommand_t *)data;
-	/*
 
-#if defined(USE_D3D10)
-	// TODO
-#else
-	glReadPixels(0, 0, cmd->width, cmd->height, GL_RGBA, GL_UNSIGNED_BYTE, cmd->captureBuffer);
-#endif
-
-	// gamma correct
-	if((tr.overbrightBits > 0) && glConfig.deviceSupportsGamma)
-		R_GammaCorrect(cmd->captureBuffer, cmd->width * cmd->height * 4);
-
-	if(cmd->motionJpeg)
+	// RB: it is possible to we still have a videoFrameCommand_t but we already stopped
+	// video recording
+	if(ri.CL_VideoRecording())
 	{
-		frameSize = SaveJPGToBuffer(cmd->encodeBuffer, 90, cmd->width, cmd->height, cmd->captureBuffer);
-		ri.CL_WriteAVIVideoFrame(cmd->encodeBuffer, frameSize);
-	}
-	else
-	{
-		frameSize = cmd->width * cmd->height;
+		glReadPixels(0, 0, cmd->width, cmd->height, GL_RGBA, GL_UNSIGNED_BYTE, cmd->captureBuffer);
 
-		for(i = 0; i < frameSize; i++)	// Pack to 24bpp and swap R and B
+		// gamma correct
+		if((tr.overbrightBits > 0) && glConfig.deviceSupportsGamma)
 		{
-			cmd->encodeBuffer[i * 3] = cmd->captureBuffer[i * 4 + 2];
-			cmd->encodeBuffer[i * 3 + 1] = cmd->captureBuffer[i * 4 + 1];
-			cmd->encodeBuffer[i * 3 + 2] = cmd->captureBuffer[i * 4];
+			R_GammaCorrect(cmd->captureBuffer, cmd->width * cmd->height * 4);
 		}
 
-		ri.CL_WriteAVIVideoFrame(cmd->encodeBuffer, frameSize * 3);
+		if(cmd->motionJpeg)
+		{
+			frameSize = SaveJPGToBuffer(cmd->encodeBuffer, 90, cmd->width, cmd->height, cmd->captureBuffer);
+			ri.CL_WriteAVIVideoFrame(cmd->encodeBuffer, frameSize);
+		}
+		else
+		{
+			frameSize = cmd->width * cmd->height;
+
+			for(i = 0; i < frameSize; i++)	// Pack to 24bpp and swap R and B
+			{
+				cmd->encodeBuffer[i * 3] = cmd->captureBuffer[i * 4 + 2];
+				cmd->encodeBuffer[i * 3 + 1] = cmd->captureBuffer[i * 4 + 1];
+				cmd->encodeBuffer[i * 3 + 2] = cmd->captureBuffer[i * 4];
+			}
+
+			ri.CL_WriteAVIVideoFrame(cmd->encodeBuffer, frameSize * 3);
+		}
 	}
-	*/
 
 	return (const void *)(cmd + 1);
 }
@@ -1063,19 +1064,30 @@ void GL_SetDefaultState(void)
 
 	// initialize downstream texture units if we're running
 	// in a multitexture environment
-	if(GLEW_ARB_multitexture)
+	if(glConfig.driverType == GLDRV_OPENGL3)
 	{
-		for(i = glConfig.maxActiveTextures - 1; i >= 0; i--)
+		for(i = 31; i >= 0; i--)
 		{
 			GL_SelectTexture(i);
 			GL_TextureMode(r_textureMode->string);
+		}
+	}
+	else
+	{
+		if(GLEW_ARB_multitexture)
+		{
+			for(i = glConfig.maxActiveTextures - 1; i >= 0; i--)
+			{
+				GL_SelectTexture(i);
+				GL_TextureMode(r_textureMode->string);
 
-			/*
-			if(i != 0)
-				glDisable(GL_TEXTURE_2D);
-			else
-				glEnable(GL_TEXTURE_2D);
-			*/
+				/*
+				if(i != 0)
+					glDisable(GL_TEXTURE_2D);
+				else
+					glEnable(GL_TEXTURE_2D);
+				*/
+			}
 		}
 	}
 
@@ -1171,7 +1183,11 @@ void GfxInfo_f(void)
 	ri.Printf(PRINT_ALL, "GL_VERSION: %s\n", glConfig.version_string);
 	ri.Printf(PRINT_ALL, "GL_EXTENSIONS: %s\n", glConfig.extensions_string);
 	ri.Printf(PRINT_ALL, "GL_MAX_TEXTURE_SIZE: %d\n", glConfig.maxTextureSize);
-	ri.Printf(PRINT_ALL, "GL_MAX_TEXTURE_UNITS_ARB: %d\n", glConfig.maxActiveTextures);
+
+	if(glConfig.driverType != GLDRV_OPENGL3)
+	{
+		ri.Printf(PRINT_ALL, "GL_MAX_TEXTURE_UNITS_ARB: %d\n", glConfig.maxActiveTextures);
+	}
 
 	/*
 	   if(glConfig.fragmentProgramAvailable)
@@ -1962,6 +1978,13 @@ void R_Init(void)
 
 	R_InitFBOs();
 
+	if(glConfig.driverType == GLDRV_OPENGL3)
+	{
+		tr.vao = 0;
+		glGenVertexArrays(1, &tr.vao);
+		glBindVertexArray(tr.vao);
+	}
+
 	R_InitVBOs();
 
 	R_InitShaders();
@@ -2036,6 +2059,13 @@ void RE_Shutdown(qboolean destroyWindow)
 		R_ShutdownFBOs();
 
 #if !defined(USE_D3D10)
+
+		if(glConfig.driverType == GLDRV_OPENGL3)
+		{
+			glDeleteVertexArrays(1, &tr.vao);
+			tr.vao = 0;
+		}
+
 		if(glConfig2.occlusionQueryBits && glConfig.driverType != GLDRV_MESA)
 		{
 			glDeleteQueriesARB(MAX_OCCLUSION_QUERIES, tr.occlusionQueryObjects);
@@ -2238,16 +2268,11 @@ refexport_t* GetRefAPI(int apiVersion, refimport_t * rimp)
 	// ET END
 
 	// XreaL BEGIN
+	re.TakeVideoFrame = RE_TakeVideoFrame;
 
 #if defined(USE_REFLIGHT)
 //	re.RegisterShaderLightAttenuation = RE_RegisterShaderLightAttenuation;
 #endif
-
-	/*
-	RB: TODO
-	
-	re.TakeVideoFrame = RE_TakeVideoFrame;
-	*/
 
 #if defined(USE_REFENTITY_ANIMATIONSYSTEM)
 	re.RegisterAnimation = RE_RegisterAnimation;
