@@ -10,7 +10,7 @@ P.S. Currently developing successor of Open Territory / XreaL - [Daemon Engine](
 **Open Territory** is fork of ET:XreaL
 
 ## Open Territory Original links
-Open Territory official page: [Sourceforge](https://sourceforge.net/p/openterritory)
+Open Territory official page: [Sourceforge](https://sourceforge.net/p/openterritory)  
 Open Territory official website not currently working, but copy of it exists on [Web Archive](http://web.archive.org/web/20111003142503/http://www.openterritory.co.uk:80//).  
 [Open Territory source code](https://sourceforge.net/p/openterritory/openterritory/ci/master/tree/) (cloned here),
 [Open Territory etmain folder](https://sourceforge.net/p/openterritory/etmain/ci/master/tree/) (cloned [here](https://github.com/Maxxiii/Open-Territory-etmain))
