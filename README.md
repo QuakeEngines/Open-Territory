@@ -2,7 +2,7 @@
 
 # Open Territory clone
 This is copy of Open Territory project. It's not in active development (since 2010), and I am not its author. I simply cloned it to Github for convenience. Original readme file, containing full description and installation instructions is "**[readme.txt](https://github.com/Maxxiii/Open-Territory/blob/master/README.txt)**".  
-P.S. Currently developing successor of Open Territory / XreaL - [Daemon Engine](https://github.com/DaemonEngine/Daemon)  
+P.S. Currently developing successors of Open Territory / XreaL - [Daemon Engine](https://github.com/DaemonEngine/Daemon), [OpenWolf Engine](https://github.com/TheDushan/OpenWolf-Engine)  
 
 ## Description
 **XreaL** is a heavily improved Quake 3 Arena engine. It's bundled with new tools and a demo game that was never finished.  
