@@ -1,7 +1,7 @@
 
 
 # Open Territory clone
-This is copy of Open Territory project. It's not in active development (since 2010), and I am not its author. I simply cloned it to Github for convenience. Original readme file, containing full description and installation instructions is "**[readme.txt](https://github.com/Maxxiii/Open-Territory/blob/master/README.txt)**".  
+This is copy of Open Territory project. It's not in active development (since 2010), and I am not its author. I simply cloned it to Github for convenience. Original readme file, containing full description and installation instructions is "**[readme.txt](https://github.com/QuakeEngines/Open-Territory/blob/master/README.txt)**".  
 P.S. Currently developing successors of Open Territory / XreaL - [Daemon Engine](https://github.com/DaemonEngine/Daemon), [OpenWolf Engine](https://github.com/TheDushan/OpenWolf-Engine)  
 
 ## Description
@@ -13,7 +13,7 @@ P.S. Currently developing successors of Open Territory / XreaL - [Daemon Engine]
 Open Territory official page: [Sourceforge](https://sourceforge.net/p/openterritory)  
 Open Territory official website not currently working, but copy of it exists on [Web Archive](http://web.archive.org/web/20111003142503/http://www.openterritory.co.uk:80//).  
 [Open Territory source code](https://sourceforge.net/p/openterritory/openterritory/ci/master/tree/) (cloned here),
-[Open Territory etmain folder](https://sourceforge.net/p/openterritory/etmain/ci/master/tree/) (cloned [here](https://github.com/Maxxiii/Open-Territory-etmain))
+[Open Territory etmain folder](https://sourceforge.net/p/openterritory/etmain/ci/master/tree/) (cloned [here](https://github.com/QuakeEngines/Open-Territory-etmain))
 
 ## ET:XreaL Original links
 ET:XreaL official pages: [Sourceforge](https://sourceforge.net/projects/xreal/), [Moddb](https://www.moddb.com/mods/etxreal) / Old thread on [Splashdamage forums](https://forums.splashdamage.com/t/et-xreal/129344/17)  
@@ -24,4 +24,4 @@ Full ET:XreaL engine package, including game files (1.5 Gb) you can download fro
 Wolfenstein: Enemy Territory is free game, you can download it [here](https://www.splashdamage.com/games/wolfenstein-enemy-territory/)
 
 ## Continue reading
-Everything else - look in original readme file (**[readme.txt](https://github.com/Maxxiii/Open-Territory/blob/master/README.txt)**).
+Everything else - look in original readme file (**[readme.txt](https://github.com/QuakeEngines/Open-Territory/blob/master/README.txt)**).
